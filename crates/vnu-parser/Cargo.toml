@@ -1,0 +1,13 @@
+[package]
+name = "vnu-parser"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vnu-core = { path = "../vnu-core" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+html5ever.workspace = true
+tendril.workspace = true

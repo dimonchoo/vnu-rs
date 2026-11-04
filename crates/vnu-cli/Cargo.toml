@@ -1,0 +1,15 @@
+[package]
+name = "vnu-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "vnu"
+path = "src/main.rs"
+
+[dependencies]
+vnu-core = { path = "../vnu-core" }
+vnu-parser = { path = "../vnu-parser" }
+serde.workspace = true
+serde_json.workspace = true

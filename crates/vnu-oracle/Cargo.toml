@@ -1,0 +1,13 @@
+[package]
+name = "vnu-oracle"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vnu-core = { path = "../vnu-core" }
+vnu-parser = { path = "../vnu-parser" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+reqwest.workspace = true
