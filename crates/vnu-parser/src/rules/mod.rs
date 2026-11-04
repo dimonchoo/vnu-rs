@@ -1,5 +1,6 @@
 pub mod aria;
 pub mod content_model;
+pub mod datatypes;
 pub mod doctype;
 pub mod duplicate_id;
 pub mod forms;
@@ -13,9 +14,10 @@ pub mod tables;
 
 pub use aria::AriaRule;
 pub use content_model::ContentModelRule;
+pub use datatypes::DatatypesRule;
 pub use doctype::DoctypeRule;
 pub use duplicate_id::DuplicateIdRule;
-pub use forms::FormsRule;
+pub use forms::{FormsRule, InputRule};
 pub use head_title::HeadTitleRule;
 pub use html_lang::HtmlLangRule;
 pub use img_alt::ImgAltRule;
@@ -35,6 +37,8 @@ pub fn default_rules() -> Vec<Box<dyn Rule>> {
         Box::new(NestingRule),
         Box::new(DuplicateIdRule::default()),
         Box::new(FormsRule),
+        Box::new(InputRule),
+        Box::new(DatatypesRule),
         Box::new(ObsoleteRule),
         Box::new(TablesRule),
         Box::new(AriaRule::default()),
