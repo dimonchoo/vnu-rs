@@ -33,13 +33,22 @@ fn handle_connection(mut stream: TcpStream, engine: &mut ValidatorEngine) {
         return;
     }
 
+    const MAX_HEADER_BYTES: usize = 64 * 1024;
     let mut reader = BufReader::new(&stream);
     let mut line = String::new();
 
-    if let Err(e) = reader.read_line(&mut line) {
-        eprintln!("Failed to read request line: {}", e);
-        send_response(&mut stream, "400 Bad Request", "text/plain", "Bad Request");
-        return;
+    // Cap the request line reading to MAX_HEADER_BYTES + 1
+    match reader.by_ref().take((MAX_HEADER_BYTES + 1) as u64).read_line(&mut line) {
+        Ok(n) if n > MAX_HEADER_BYTES => {
+            send_response(&mut stream, "431 Request Header Fields Too Large", "text/plain", "Headers Too Large");
+            return;
+        }
+        Ok(_) => {}
+        Err(e) => {
+            eprintln!("Failed to read request line: {}", e);
+            send_response(&mut stream, "400 Bad Request", "text/plain", "Bad Request");
+            return;
+        }
     }
     if line.trim().is_empty() {
         return;
@@ -58,11 +67,11 @@ fn handle_connection(mut stream: TcpStream, engine: &mut ValidatorEngine) {
 
     let mut content_length = 0usize;
     let mut total_header_bytes = line.len();
-    const MAX_HEADER_BYTES: usize = 64 * 1024;
 
     loop {
         line.clear();
-        match reader.read_line(&mut line) {
+        let remaining_cap = (MAX_HEADER_BYTES.saturating_sub(total_header_bytes) + 1) as u64;
+        match reader.by_ref().take(remaining_cap).read_line(&mut line) {
             Ok(0) => break,
             Ok(n) => {
                 total_header_bytes += n;

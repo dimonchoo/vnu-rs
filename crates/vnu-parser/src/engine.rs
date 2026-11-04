@@ -290,7 +290,7 @@ impl<'a> TokenSink for StreamingSink<'a> {
     type Handle = ();
     fn process_token(&self, token: Token, line_number: u64) -> TokenSinkResult<()> {
         let raw_kind = match &token {
-            Token::TagToken(tag) if tag.kind == TagKind::StartTag => {
+            Token::TagToken(tag) if tag.kind == TagKind::StartTag && !tag.self_closing => {
                 let n = tag.name.as_ref();
                 if n.eq_ignore_ascii_case("script") {
                     Some(TokenSinkResult::RawData(RawKind::ScriptData))
@@ -371,7 +371,11 @@ impl ValidatorEngine {
                 let snippet = line_index.line_snippet(html, l);
                 if !snippet.is_empty() {
                     let truncated = if snippet.len() > 120 {
-                        &snippet[..120]
+                        let mut end = 120;
+                        while end > 0 && !snippet.is_char_boundary(end) {
+                            end -= 1;
+                        }
+                        &snippet[..end]
                     } else {
                         snippet
                     };

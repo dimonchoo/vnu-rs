@@ -302,7 +302,7 @@ fn validate_attributes(tag: &ElementContext, elem_name: &str, msgs: &mut Vec<VNu
 
     if tag.has_attr("aria-dropeffect") {
         msgs.push(VNuMessage::warning(
-            "The “aria-dropeffect” attribute is deprecated and should not be used.",
+            "The “aria-dropeffect” attribute is deprecated and should not be used. Support for it is poor and is unlikely to improve.",
             tag.line,
             tag.col,
         ));
