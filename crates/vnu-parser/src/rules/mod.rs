@@ -24,7 +24,7 @@ pub use content_model::ContentModelRule;
 pub use datatypes::DatatypesRule;
 pub use doctype::DoctypeRule;
 pub use duplicate_id::DuplicateIdRule;
-pub use forms::{FormsRule, InputRule};
+pub use forms::{FormsRule, InputRule, SelectRule};
 pub use head_title::HeadTitleRule;
 pub use html_lang::HtmlLangRule;
 pub use img_alt::ImgAltRule;
@@ -50,6 +50,7 @@ pub fn default_rules() -> Vec<Box<dyn Rule>> {
         Box::new(DuplicateIdRule::default()),
         Box::new(FormsRule::default()),
         Box::new(InputRule::default()),
+        Box::new(SelectRule::default()),
         Box::new(DatatypesRule),
         Box::new(ObsoleteRule),
         Box::new(ScriptingRule::default()),

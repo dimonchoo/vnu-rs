@@ -124,4 +124,14 @@ mod tests {
         assert!(report.messages.iter().any(|m| m.message.contains("Bad value “invalid” for attribute “content” on element “meta”.")));
         assert!(report.messages.iter().any(|m| m.message.contains("Consider avoiding viewport values that prevent users from resizing documents.")));
     }
+
+    #[test]
+    fn test_select_and_option_rules() {
+        let mut engine = ValidatorEngine::default();
+        let invalid = "<!DOCTYPE html><html lang=\"en\"><head><title>T</title></head><body><select multiple><button>B</button><option>1</option></select><select required><option value=\"val\">not-empty</option></select></body></html>";
+        let report = engine.validate(invalid);
+        assert!(!report.is_valid());
+        assert!(report.messages.iter().any(|m| m.message.contains("A “button” element is only allowed as a child of a “select” element that is a drop-down box")));
+        assert!(report.messages.iter().any(|m| m.message.contains("must have either an empty “value” attribute, or must have no text content")));
+    }
 }

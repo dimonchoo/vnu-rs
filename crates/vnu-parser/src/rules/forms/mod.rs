@@ -1,7 +1,9 @@
 pub mod input;
+pub mod select;
 pub mod types;
 
 pub use input::InputRule;
+pub use select::SelectRule;
 pub use types::{effective_input_type, VALID_BUTTON_TYPES, VALID_INPUT_TYPES};
 
 use vnu_core::VNuMessage;

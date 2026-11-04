@@ -29,9 +29,17 @@ impl Rule for ContentModelRule {
 
         if let Some(expected_parents) = allowed_parents(&name_lower) {
             let parent_opt = ctx.parent();
-            let parent_matches = parent_opt
+            let mut parent_matches = parent_opt
                 .map(|p| expected_parents.iter().any(|&exp| exp.eq_ignore_ascii_case(&p.name)))
                 .unwrap_or(false);
+
+            if !parent_matches
+                && (name_lower == "option" || name_lower == "optgroup")
+                && parent_opt.is_some_and(|p| p.name.eq_ignore_ascii_case("div"))
+                && ctx.is_descendant_of("select")
+            {
+                parent_matches = true;
+            }
 
             if !parent_matches {
                 let parent_name = parent_opt.map(|p| p.name.as_str()).unwrap_or("body");
