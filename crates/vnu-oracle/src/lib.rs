@@ -190,4 +190,25 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn test_metadata_differential() {
+        let harness = OracleHarness::default();
+        let test_html = "<!DOCTYPE html><html lang='en'><head><title>T</title><base href='/'><base href='/2'><meta charset='latin1'><link rel='stylesheet'></head><body><svg><path d='M0 0'></svg></body></html>";
+        match harness.compare(test_html) {
+            Ok(diff) => {
+                println!("Metadata diff -> Matched: {:?}", diff.matched_rules);
+                println!("Missing in local: {:?}", diff.missing_in_local);
+                assert!(!diff.oracle_valid);
+                assert!(!diff.local_valid);
+                assert!(diff.matched_rules.iter().any(|m| m.contains("base")));
+                assert!(diff.matched_rules.iter().any(|m| m.contains("charset")));
+                assert!(diff.matched_rules.iter().any(|m| m.contains("link")));
+                assert!(diff.matched_rules.iter().any(|m| m.contains("End tag “svg” did not match")));
+            }
+            Err(e) => {
+                panic!("Oracle check failed: {:?}", e);
+            }
+        }
+    }
 }

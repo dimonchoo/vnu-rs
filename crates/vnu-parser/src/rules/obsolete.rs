@@ -8,6 +8,7 @@ const OBSOLETE_ELEMENTS_CSS: &[&str] = &[
 
 const OBSOLETE_ATTRIBUTES_CSS: &[&str] = &[
     "align", "bgcolor", "valign", "hspace", "vspace", "marginheight", "marginwidth",
+    "frameborder", "scrolling",
 ];
 
 #[derive(Default)]

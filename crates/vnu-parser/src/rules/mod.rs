@@ -6,6 +6,7 @@ pub mod forms;
 pub mod head_title;
 pub mod html_lang;
 pub mod img_alt;
+pub mod metadata;
 pub mod nesting;
 pub mod obsolete;
 pub mod tables;
@@ -18,6 +19,7 @@ pub use forms::FormsRule;
 pub use head_title::HeadTitleRule;
 pub use html_lang::HtmlLangRule;
 pub use img_alt::ImgAltRule;
+pub use metadata::MetadataRule;
 pub use nesting::NestingRule;
 pub use obsolete::ObsoleteRule;
 pub use tables::TablesRule;
@@ -37,5 +39,6 @@ pub fn default_rules() -> Vec<Box<dyn Rule>> {
         Box::new(TablesRule::default()),
         Box::new(AriaRule::default()),
         Box::new(ContentModelRule::default()),
+        Box::new(MetadataRule::default()),
     ]
 }

@@ -75,4 +75,16 @@ mod tests {
         assert!(report.messages.iter().any(|m| m.message.contains("Element “li” not allowed as child of element “body”")));
         assert!(report.messages.iter().any(|m| m.message.contains("Element “source” not allowed as child of element “body”")));
     }
+
+    #[test]
+    fn test_metadata_and_tag_mismatch() {
+        let mut engine = ValidatorEngine::default();
+        let html = "<!DOCTYPE html><html lang=\"en\"><head><title>T</title><base href=\"/\"><base href=\"/2\"><meta charset=\"latin1\"><link rel=\"stylesheet\"></head><body><svg><path d=\"M0 0\"></svg></body></html>";
+        let report = engine.validate(html);
+        assert!(!report.is_valid());
+        assert!(report.messages.iter().any(|m| m.message.contains("Element “base” not allowed as child of element “head”")));
+        assert!(report.messages.iter().any(|m| m.message.contains("The only allowed value for the “charset” attribute for the “meta” element is “utf-8”")));
+        assert!(report.messages.iter().any(|m| m.message.contains("A “link” element must have an “href” or “imagesrcset” attribute")));
+        assert!(report.messages.iter().any(|m| m.message.contains("End tag “svg” did not match the name of the current open element (“path”)")));
+    }
 }

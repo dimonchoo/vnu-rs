@@ -90,6 +90,18 @@ impl<'a> StreamingValidator<'a> {
                         }
 
                         if let Some(pos) = self.ctx.open_elements.iter().rposition(|e| e.name.eq_ignore_ascii_case(&name_str)) {
+                            if pos + 1 < self.ctx.open_elements.len() {
+                                let current_open = self.ctx.open_elements.last().map(|e| e.name.as_str()).unwrap_or("");
+                                self.messages.push(VNuMessage::error(
+                                    format!(
+                                        "End tag “{}” did not match the name of the current open element (“{}”).",
+                                        name_str, current_open
+                                    ),
+                                    line,
+                                    col,
+                                ));
+                            }
+
                             for rule in &mut self.rules {
                                 self.messages.extend(rule.on_end_tag(&self.ctx, &name_str, line, col));
                             }
