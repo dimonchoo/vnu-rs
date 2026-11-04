@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use html5ever::tokenizer::states::RawKind;
 use html5ever::tokenizer::{
     BufferQueue, TagKind, Token, TokenSink, TokenSinkResult, Tokenizer, TokenizerOpts,
     TokenizerResult,
@@ -15,6 +16,96 @@ const VOID_ELEMENTS: &[&str] = &[
 
 fn is_void_element(name: &str) -> bool {
     VOID_ELEMENTS.iter().any(|&v| v.eq_ignore_ascii_case(name))
+}
+
+fn apply_implicit_closures(open_elements: &mut Vec<ElementContext>, tag_name: &str, is_start_tag: bool) {
+    if is_start_tag {
+        if tag_name.eq_ignore_ascii_case("li") {
+            if let Some(top) = open_elements.last() {
+                if top.name.eq_ignore_ascii_case("li") {
+                    open_elements.pop();
+                }
+            }
+        } else if tag_name.eq_ignore_ascii_case("option") {
+            if let Some(top) = open_elements.last() {
+                if top.name.eq_ignore_ascii_case("option") {
+                    open_elements.pop();
+                }
+            }
+        } else if tag_name.eq_ignore_ascii_case("dt") || tag_name.eq_ignore_ascii_case("dd") {
+            if let Some(top) = open_elements.last() {
+                if top.name.eq_ignore_ascii_case("dt") || top.name.eq_ignore_ascii_case("dd") {
+                    open_elements.pop();
+                }
+            }
+        } else if tag_name.eq_ignore_ascii_case("td") || tag_name.eq_ignore_ascii_case("th") {
+            if let Some(top) = open_elements.last() {
+                if top.name.eq_ignore_ascii_case("td") || top.name.eq_ignore_ascii_case("th") {
+                    open_elements.pop();
+                }
+            }
+        } else if tag_name.eq_ignore_ascii_case("tr") {
+            while let Some(top) = open_elements.last() {
+                if top.name.eq_ignore_ascii_case("td")
+                    || top.name.eq_ignore_ascii_case("th")
+                    || top.name.eq_ignore_ascii_case("tr")
+                {
+                    open_elements.pop();
+                } else {
+                    break;
+                }
+            }
+        } else if tag_name.eq_ignore_ascii_case("p")
+            || ["div", "ul", "ol", "table", "h1", "h2", "h3", "h4", "h5", "h6",
+                "pre", "blockquote", "form", "hr", "header", "footer", "nav", "section", "article"]
+                .iter()
+                .any(|&e| e.eq_ignore_ascii_case(tag_name))
+        {
+            if let Some(top) = open_elements.last() {
+                if top.name.eq_ignore_ascii_case("p") {
+                    open_elements.pop();
+                }
+            }
+        }
+    } else if tag_name.eq_ignore_ascii_case("ul") || tag_name.eq_ignore_ascii_case("ol") {
+        if let Some(top) = open_elements.last() {
+            if top.name.eq_ignore_ascii_case("li") {
+                open_elements.pop();
+            }
+        }
+    } else if tag_name.eq_ignore_ascii_case("dl") {
+        if let Some(top) = open_elements.last() {
+            if top.name.eq_ignore_ascii_case("dt") || top.name.eq_ignore_ascii_case("dd") {
+                open_elements.pop();
+            }
+        }
+    } else if tag_name.eq_ignore_ascii_case("tr") {
+        if let Some(top) = open_elements.last() {
+            if top.name.eq_ignore_ascii_case("td") || top.name.eq_ignore_ascii_case("th") {
+                open_elements.pop();
+            }
+        }
+    } else if tag_name.eq_ignore_ascii_case("datalist")
+        || tag_name.eq_ignore_ascii_case("select")
+        || tag_name.eq_ignore_ascii_case("optgroup")
+    {
+        if let Some(top) = open_elements.last() {
+            if top.name.eq_ignore_ascii_case("option") {
+                open_elements.pop();
+            }
+        }
+    } else if ["table", "tbody", "thead", "tfoot"].iter().any(|&e| e.eq_ignore_ascii_case(tag_name)) {
+        while let Some(top) = open_elements.last() {
+            if top.name.eq_ignore_ascii_case("td")
+                || top.name.eq_ignore_ascii_case("th")
+                || top.name.eq_ignore_ascii_case("tr")
+            {
+                open_elements.pop();
+            } else {
+                break;
+            }
+        }
+    }
 }
 
 struct StreamingValidator<'a> {
@@ -107,6 +198,13 @@ impl<'a> StreamingValidator<'a> {
                             self.ctx.title_seen = true;
                         }
 
+                        if let Some(id) = elem.get_attr("id") {
+                            self.ctx.seen_ids.insert(id.to_string());
+                        }
+
+                        // Implicit end tags for optional HTML5 elements
+                        apply_implicit_closures(&mut self.ctx.open_elements, &name_str, true);
+
                         for rule in &mut self.rules {
                             self.messages.extend(rule.on_start_tag(&self.ctx, &elem));
                         }
@@ -124,6 +222,9 @@ impl<'a> StreamingValidator<'a> {
                             ));
                             return;
                         }
+
+                        // Implicit closure before closing parent containers
+                        apply_implicit_closures(&mut self.ctx.open_elements, &name_str, false);
 
                         if let Some(pos) = self.ctx.open_elements.iter().rposition(|e| e.name.eq_ignore_ascii_case(&name_str)) {
                             if pos + 1 < self.ctx.open_elements.len() {
@@ -188,8 +289,30 @@ struct StreamingSink<'a> {
 impl<'a> TokenSink for StreamingSink<'a> {
     type Handle = ();
     fn process_token(&self, token: Token, line_number: u64) -> TokenSinkResult<()> {
+        let raw_kind = match &token {
+            Token::TagToken(tag) if tag.kind == TagKind::StartTag => {
+                let n = tag.name.as_ref();
+                if n.eq_ignore_ascii_case("script") {
+                    Some(TokenSinkResult::RawData(RawKind::ScriptData))
+                } else if n.eq_ignore_ascii_case("style")
+                    || n.eq_ignore_ascii_case("iframe")
+                    || n.eq_ignore_ascii_case("xmp")
+                    || n.eq_ignore_ascii_case("noembed")
+                    || n.eq_ignore_ascii_case("noframes")
+                {
+                    Some(TokenSinkResult::RawData(RawKind::Rawtext))
+                } else if n.eq_ignore_ascii_case("title") || n.eq_ignore_ascii_case("textarea") {
+                    Some(TokenSinkResult::RawData(RawKind::Rcdata))
+                } else if n.eq_ignore_ascii_case("plaintext") {
+                    Some(TokenSinkResult::Plaintext)
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        };
         self.inner.borrow_mut().handle_token(token, line_number);
-        TokenSinkResult::Continue
+        raw_kind.unwrap_or(TokenSinkResult::Continue)
     }
 }
 
@@ -214,6 +337,10 @@ impl ValidatorEngine {
         let mut report = VNuReport::new();
         let line_index = LineIndex::new(html);
 
+        for r in &mut self.rules {
+            r.reset();
+        }
+
         // Take rules temporarily for streaming validation
         let active_rules = std::mem::take(&mut self.rules);
         let sink = StreamingSink {
@@ -221,26 +348,34 @@ impl ValidatorEngine {
         };
 
         let tok = Tokenizer::new(sink, TokenizerOpts::default());
-        let mut input = BufferQueue::default();
+        let input = BufferQueue::default();
         input.push_back(html.into());
 
-        match tok.feed(&mut input) {
+        match tok.feed(&input) {
             TokenizerResult::Done | TokenizerResult::Script(_) => {}
         }
         tok.end();
 
         // Reclaim rules and messages
         let inner = tok.sink.inner.into_inner();
-        let (_ctx, rules, messages) = inner.finish();
+        let (_ctx, mut rules, messages) = inner.finish();
+        for r in &mut rules {
+            r.reset();
+        }
         self.rules = rules;
         report.messages = messages;
 
-        // Populate line extracts where possible
+        // Populate line extracts where possible (truncated to 120 chars for performance)
         for msg in &mut report.messages {
             if let Some(l) = msg.last_line {
                 let snippet = line_index.line_snippet(html, l);
                 if !snippet.is_empty() {
-                    msg.extract = Some(snippet.to_string());
+                    let truncated = if snippet.len() > 120 {
+                        &snippet[..120]
+                    } else {
+                        snippet
+                    };
+                    msg.extract = Some(truncated.to_string());
                 }
             }
         }

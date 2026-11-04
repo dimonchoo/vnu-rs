@@ -69,6 +69,12 @@ impl ElementContext {
     pub fn has_attr(&self, name: &str) -> bool {
         self.attrs.iter().any(|(k, _)| k.eq_ignore_ascii_case(name))
     }
+
+    pub fn has_attr_val(&self, name: &str, val: &str) -> bool {
+        self.get_attr(name)
+            .map(|v| v.eq_ignore_ascii_case(val))
+            .unwrap_or(false)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -88,6 +94,7 @@ pub struct ValidationContext<'a> {
     pub head_seen: bool,
     pub title_seen: bool,
     pub body_seen: bool,
+    pub seen_ids: std::collections::HashSet<String>,
 }
 
 impl<'a> ValidationContext<'a> {
@@ -101,7 +108,16 @@ impl<'a> ValidationContext<'a> {
             head_seen: false,
             title_seen: false,
             body_seen: false,
+            seen_ids: std::collections::HashSet::new(),
         }
+    }
+
+    pub fn has_ancestor_role(&self, role_name: &str) -> bool {
+        self.open_elements.iter().rev().any(|e| {
+            e.get_attr("role")
+                .map(|r| r.split_whitespace().any(|token| token.eq_ignore_ascii_case(role_name)))
+                .unwrap_or(false)
+        })
     }
 
     pub fn is_descendant_of(&self, tag_name: &str) -> bool {

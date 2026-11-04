@@ -12,7 +12,7 @@ const QUEUE_CAPACITY: usize = 32; // Bounded channel for backpressure
 
 fn send_response(stream: &mut TcpStream, status: &str, content_type: &str, body: &str) {
     let response = format!(
-        "HTTP/1.1 {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n{}",
+        "HTTP/1.1 {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type, User-Agent\r\nConnection: close\r\n\r\n{}",
         status,
         content_type,
         body.len(),
@@ -24,6 +24,15 @@ fn send_response(stream: &mut TcpStream, status: &str, content_type: &str, body:
 }
 
 fn handle_connection(mut stream: TcpStream, engine: &mut ValidatorEngine) {
+    if let Err(e) = stream.set_read_timeout(Some(std::time::Duration::from_secs(5))) {
+        eprintln!("Failed to set socket read timeout: {}", e);
+        return;
+    }
+    if let Err(e) = stream.set_write_timeout(Some(std::time::Duration::from_secs(5))) {
+        eprintln!("Failed to set socket write timeout: {}", e);
+        return;
+    }
+
     let mut reader = BufReader::new(&stream);
     let mut line = String::new();
 
@@ -42,13 +51,25 @@ fn handle_connection(mut stream: TcpStream, engine: &mut ValidatorEngine) {
         .unwrap_or("")
         .to_ascii_uppercase();
 
+    if method == "OPTIONS" {
+        send_response(&mut stream, "204 No Content", "text/plain", "");
+        return;
+    }
+
     let mut content_length = 0usize;
+    let mut total_header_bytes = line.len();
+    const MAX_HEADER_BYTES: usize = 64 * 1024;
 
     loop {
         line.clear();
         match reader.read_line(&mut line) {
             Ok(0) => break,
-            Ok(_) => {
+            Ok(n) => {
+                total_header_bytes += n;
+                if total_header_bytes > MAX_HEADER_BYTES {
+                    send_response(&mut stream, "431 Request Header Fields Too Large", "text/plain", "Headers Too Large");
+                    return;
+                }
                 if line.trim().is_empty() {
                     break;
                 }
@@ -123,7 +144,15 @@ pub fn run_server(port: u16) {
                 };
 
                 match stream_opt {
-                    Some(stream) => handle_connection(stream, &mut engine),
+                    Some(stream) => {
+                        let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                            handle_connection(stream, &mut engine);
+                        }));
+                        if res.is_err() {
+                            eprintln!("Worker {} recovered from panic, resetting engine", worker_id);
+                            engine = ValidatorEngine::default();
+                        }
+                    }
                     None => break,
                 }
             }

@@ -12,6 +12,10 @@ impl Rule for DoctypeRule {
         "doctype"
     }
 
+    fn reset(&mut self) {
+        self.emitted = false;
+    }
+
     fn on_start_tag(&mut self, ctx: &ValidationContext, tag: &ElementContext) -> Vec<VNuMessage> {
         if ctx.mode == crate::context::DocumentMode::Svg {
             return vec![];

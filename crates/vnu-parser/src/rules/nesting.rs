@@ -46,18 +46,6 @@ impl Rule for NestingRule {
             ));
         }
 
-        if name_lower == "div" {
-            if let Some(parent) = ctx.parent() {
-                if parent.name.eq_ignore_ascii_case("p") {
-                    msgs.push(VNuMessage::error(
-                        "An element “div” not allowed as child of element “p” in this context.",
-                        tag.line,
-                        tag.col,
-                    ));
-                }
-            }
-        }
-
         msgs
     }
 }

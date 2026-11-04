@@ -12,6 +12,10 @@ impl Rule for MetadataRule {
         "metadata"
     }
 
+    fn reset(&mut self) {
+        self.base_seen = false;
+    }
+
     fn on_start_tag(&mut self, _ctx: &ValidationContext, tag: &ElementContext) -> Vec<VNuMessage> {
         let mut msgs = Vec::new();
         let name_lower = tag.name.to_ascii_lowercase();
@@ -52,14 +56,12 @@ impl Rule for MetadataRule {
                     tag.col,
                 ));
             }
-        } else if name_lower == "script" {
-            if tag.has_attr("language") {
-                msgs.push(VNuMessage::warning(
-                    "The “language” attribute on the “script” element is obsolete. Use the “type” attribute instead.",
-                    tag.line,
-                    tag.col,
-                ));
-            }
+        } else if name_lower == "script" && tag.has_attr("language") {
+            msgs.push(VNuMessage::warning(
+                "The “language” attribute on the “script” element is obsolete. Use the “type” attribute instead.",
+                tag.line,
+                tag.col,
+            ));
         }
 
         msgs

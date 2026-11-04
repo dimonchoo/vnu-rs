@@ -29,16 +29,16 @@ use crate::rule::Rule;
 pub fn default_rules() -> Vec<Box<dyn Rule>> {
     vec![
         Box::new(DoctypeRule::default()),
-        Box::new(HtmlLangRule::default()),
+        Box::new(HtmlLangRule),
         Box::new(HeadTitleRule::default()),
-        Box::new(ImgAltRule::default()),
-        Box::new(NestingRule::default()),
+        Box::new(ImgAltRule),
+        Box::new(NestingRule),
         Box::new(DuplicateIdRule::default()),
-        Box::new(FormsRule::default()),
-        Box::new(ObsoleteRule::default()),
-        Box::new(TablesRule::default()),
+        Box::new(FormsRule),
+        Box::new(ObsoleteRule),
+        Box::new(TablesRule),
         Box::new(AriaRule::default()),
-        Box::new(ContentModelRule::default()),
+        Box::new(ContentModelRule),
         Box::new(MetadataRule::default()),
     ]
 }

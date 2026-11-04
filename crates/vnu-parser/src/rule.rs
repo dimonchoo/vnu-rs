@@ -4,6 +4,8 @@ use crate::context::{ElementContext, ValidationContext};
 pub trait Rule: Send + Sync {
     fn name(&self) -> &'static str;
 
+    fn reset(&mut self) {}
+
     fn on_doctype(&mut self, _ctx: &ValidationContext, _name: &str, _line: usize, _col: usize) -> Vec<VNuMessage> {
         vec![]
     }

@@ -5,7 +5,7 @@ use crate::rule::Rule;
 fn allowed_parents(tag_name: &str) -> Option<&'static [&'static str]> {
     match tag_name {
         "li" => Some(&["ul", "ol", "menu"]),
-        "dt" | "dd" => Some(&["dl"]),
+        "dt" | "dd" => Some(&["dl", "div"]),
         "source" => Some(&["audio", "video", "picture"]),
         "track" => Some(&["audio", "video"]),
         "area" => Some(&["map"]),

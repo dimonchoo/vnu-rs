@@ -76,11 +76,12 @@ impl OracleHarness {
 
         for o_msg in &oracle_report.messages {
             let o_str = o_msg.message.as_str();
-            if local_set.contains(o_str) {
-                matched.push(o_msg.message.clone());
-            } else if local_report.messages.iter().any(|l| {
-                l.message.contains(o_str) || o_str.contains(&l.message)
-            }) {
+            if local_set.contains(o_str)
+                || local_report
+                    .messages
+                    .iter()
+                    .any(|l| l.message.contains(o_str) || o_str.contains(&l.message))
+            {
                 matched.push(o_msg.message.clone());
             } else {
                 missing.push(o_msg.message.clone());
