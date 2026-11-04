@@ -243,10 +243,20 @@ pub fn validate_speculationrules(text: &str, line: usize, col: usize, msgs: &mut
     }
 }
 
-fn validate_predicate(pred: &serde_json::Map<String, serde_json::Value>, line: usize, col: usize, msgs: &mut Vec<VNuMessage>) {
+fn validate_predicate(
+    pred: &serde_json::Map<String, serde_json::Value>,
+    line: usize,
+    col: usize,
+    msgs: &mut Vec<VNuMessage>,
+) {
     let pred_keys: Vec<&str> = pred
         .keys()
-        .filter(|k| matches!(k.as_str(), "and" | "or" | "not" | "href_matches" | "selector_matches"))
+        .filter(|k| {
+            matches!(
+                k.as_str(),
+                "and" | "or" | "not" | "href_matches" | "selector_matches"
+            )
+        })
         .map(|k| k.as_str())
         .collect();
 
@@ -296,7 +306,10 @@ fn validate_predicate(pred: &serde_json::Map<String, serde_json::Value>, line: u
                 }
                 None => {
                     msgs.push(VNuMessage::error(
-                        format!("The “{}” property in a document rule must be a JSON array.", key),
+                        format!(
+                            "The “{}” property in a document rule must be a JSON array.",
+                            key
+                        ),
                         line,
                         col,
                     ));

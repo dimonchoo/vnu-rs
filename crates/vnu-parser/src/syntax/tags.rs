@@ -18,7 +18,8 @@ pub fn handle_tag_open(bytes: &[u8], idx: usize, src: &str, msgs: &mut Vec<VNuMe
 
     if next == b'>' {
         msgs.push(VNuMessage::error(
-            "Saw “<>”. Probable causes: Unescaped “<” (escape as “&lt;”) or mistyped start tag.".to_string(),
+            "Saw “<>”. Probable causes: Unescaped “<” (escape as “&lt;”) or mistyped start tag."
+                .to_string(),
             1,
             1,
         ));
@@ -31,9 +32,16 @@ pub fn handle_tag_open(bytes: &[u8], idx: usize, src: &str, msgs: &mut Vec<VNuMe
 
     let rest = &bytes[idx + 1..];
     if rest.starts_with(b"image ") || rest.starts_with(b"image>") || rest.starts_with(b"image/") {
-        msgs.push(VNuMessage::error("Saw a start tag “image”.".to_string(), 1, 1));
+        msgs.push(VNuMessage::error(
+            "Saw a start tag “image”.".to_string(),
+            1,
+            1,
+        ));
     }
-    if rest.starts_with(b"frameset ") || rest.starts_with(b"frameset>") || rest.starts_with(b"frameset/") {
+    if rest.starts_with(b"frameset ")
+        || rest.starts_with(b"frameset>")
+        || rest.starts_with(b"frameset/")
+    {
         msgs.push(VNuMessage::error(
             "The “frameset” element is obsolete. Use the “iframe” element and CSS instead, or use server-side includes.".to_string(),
             1,
@@ -59,7 +67,8 @@ fn handle_end_tag(bytes: &[u8], idx: usize, src: &str, msgs: &mut Vec<VNuMessage
 
     if bytes[idx + 2] == b'>' {
         msgs.push(VNuMessage::error(
-            "Saw “</>”. Probable causes: Unescaped “<” (escape as “&lt;”) or mistyped end tag.".to_string(),
+            "Saw “</>”. Probable causes: Unescaped “<” (escape as “&lt;”) or mistyped end tag."
+                .to_string(),
             1,
             1,
         ));
@@ -74,11 +83,19 @@ fn handle_end_tag(bytes: &[u8], idx: usize, src: &str, msgs: &mut Vec<VNuMessage
     if let Some(pos) = end_tag_close {
         let tag_slice = &bytes[idx + 2..idx + 2 + pos];
         if tag_slice.ends_with(b"/") {
-            msgs.push(VNuMessage::error("Stray “/” at the end of an end tag.".to_string(), 1, 1));
+            msgs.push(VNuMessage::error(
+                "Stray “/” at the end of an end tag.".to_string(),
+                1,
+                1,
+            ));
         }
         let tag_str = String::from_utf8_lossy(tag_slice);
         if tag_str.split_whitespace().count() > 1 {
-            msgs.push(VNuMessage::error("End tag had attributes.".to_string(), 1, 1));
+            msgs.push(VNuMessage::error(
+                "End tag had attributes.".to_string(),
+                1,
+                1,
+            ));
         }
         if tag_str.trim().eq_ignore_ascii_case("br") {
             msgs.push(VNuMessage::error("End tag “br”.".to_string(), 1, 1));
@@ -87,7 +104,11 @@ fn handle_end_tag(bytes: &[u8], idx: usize, src: &str, msgs: &mut Vec<VNuMessage
             || tag_str.trim().eq_ignore_ascii_case("style/")
             || (tag_str.trim().eq_ignore_ascii_case("style") && src.contains("<script"))
         {
-            msgs.push(VNuMessage::error("End of file seen when expecting text or an end tag.".to_string(), 1, 1));
+            msgs.push(VNuMessage::error(
+                "End of file seen when expecting text or an end tag.".to_string(),
+                1,
+                1,
+            ));
         }
         2 + pos + 1
     } else {
@@ -103,7 +124,11 @@ fn scan_start_tag(bytes: &[u8], idx: usize, src: &str, msgs: &mut Vec<VNuMessage
         let b = bytes[j];
 
         if b == b'/' && j + 1 < len && bytes[j + 1] == b' ' {
-            msgs.push(VNuMessage::error("A slash was not immediately followed by “>”.".to_string(), 1, 1));
+            msgs.push(VNuMessage::error(
+                "A slash was not immediately followed by “>”.".to_string(),
+                1,
+                1,
+            ));
         }
 
         if b == b'=' {
@@ -117,7 +142,12 @@ fn scan_start_tag(bytes: &[u8], idx: usize, src: &str, msgs: &mut Vec<VNuMessage
 
         if b == b'<' {
             if j > 0 && bytes[j - 1].is_ascii_alphabetic() {
-                msgs.push(VNuMessage::error("“<” in attribute name. Probable cause: “>” missing immediately before.".to_string(), 1, 1));
+                msgs.push(VNuMessage::error(
+                    "“<” in attribute name. Probable cause: “>” missing immediately before."
+                        .to_string(),
+                    1,
+                    1,
+                ));
             } else {
                 msgs.push(VNuMessage::error("Saw “<” when expecting an attribute name. Probable cause: Missing “>” immediately before.".to_string(), 1, 1));
             }
@@ -139,7 +169,9 @@ fn scan_start_tag(bytes: &[u8], idx: usize, src: &str, msgs: &mut Vec<VNuMessage
 
 fn check_equals_sign(bytes: &[u8], eq_idx: usize, src: &str, msgs: &mut Vec<VNuMessage>) -> usize {
     let mut k = eq_idx + 1;
-    while k < bytes.len() && (bytes[k] == b' ' || bytes[k] == b'\t' || bytes[k] == b'\n' || bytes[k] == b'\r') {
+    while k < bytes.len()
+        && (bytes[k] == b' ' || bytes[k] == b'\t' || bytes[k] == b'\n' || bytes[k] == b'\r')
+    {
         k += 1;
     }
     if k >= bytes.len() {
@@ -169,7 +201,11 @@ fn check_equals_sign(bytes: &[u8], eq_idx: usize, src: &str, msgs: &mut Vec<VNuM
         ));
         k + 1
     } else if val_first == b'>' {
-        msgs.push(VNuMessage::error("Attribute value missing.".to_string(), 1, 1));
+        msgs.push(VNuMessage::error(
+            "Attribute value missing.".to_string(),
+            1,
+            1,
+        ));
         k
     } else if val_first == b'"' || val_first == b'\'' {
         let quote = val_first;
@@ -182,7 +218,11 @@ fn check_equals_sign(bytes: &[u8], eq_idx: usize, src: &str, msgs: &mut Vec<VNuM
         }
         if close_idx < bytes.len() {
             if close_idx + 1 < bytes.len() && bytes[close_idx + 1].is_ascii_alphabetic() {
-                msgs.push(VNuMessage::error("No space between attributes.".to_string(), 1, 1));
+                msgs.push(VNuMessage::error(
+                    "No space between attributes.".to_string(),
+                    1,
+                    1,
+                ));
             }
             close_idx + 1
         } else {

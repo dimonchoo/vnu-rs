@@ -1,11 +1,10 @@
-use std::collections::HashSet;
-use vnu_core::VNuMessage;
 use crate::context::{ElementContext, ValidationContext};
 use crate::rule::Rule;
+use std::collections::HashSet;
+use vnu_core::VNuMessage;
 
 const DISALLOWED_IN_DT: &[&str] = &[
-    "article", "nav", "section", "header", "footer", "h1", "h2", "h3", "h4", "h5",
-    "h6", "hgroup",
+    "article", "nav", "section", "header", "footer", "h1", "h2", "h3", "h4", "h5", "h6", "hgroup",
 ];
 
 #[derive(Default)]
@@ -61,7 +60,9 @@ impl Rule for DlRule {
                 top.name.eq_ignore_ascii_case("dl")
                     || (top.name.eq_ignore_ascii_case("div")
                         && ctx.open_elements.len() >= 2
-                        && ctx.open_elements[ctx.open_elements.len() - 2].name.eq_ignore_ascii_case("dl"))
+                        && ctx.open_elements[ctx.open_elements.len() - 2]
+                            .name
+                            .eq_ignore_ascii_case("dl"))
             })
     }
 
@@ -72,7 +73,10 @@ impl Rule for DlRule {
         // 1. Disallowed descendants in dt
         if DISALLOWED_IN_DT.contains(&el.as_str()) && ctx.is_descendant_of("dt") {
             msgs.push(VNuMessage::error(
-                format!("The element “{}” must not appear as a descendant of the “dt” element.", el),
+                format!(
+                    "The element “{}” must not appear as a descendant of the “dt” element.",
+                    el
+                ),
                 tag.line,
                 tag.col,
             ));
@@ -81,7 +85,11 @@ impl Rule for DlRule {
         // 2. Dl tag opening
         if el == "dl" {
             if ctx.is_descendant_of("dl") {
-                let parent_name = ctx.open_elements.last().map(|e| e.name.as_str()).unwrap_or("");
+                let parent_name = ctx
+                    .open_elements
+                    .last()
+                    .map(|e| e.name.as_str())
+                    .unwrap_or("");
                 if parent_name.eq_ignore_ascii_case("div") {
                     msgs.push(VNuMessage::error(
                         "Element “dl” not allowed as child of “div” in this context.",
@@ -108,7 +116,13 @@ impl Rule for DlRule {
             self.dt_col = tag.col;
         }
 
-        if el == "template" && ctx.open_elements.last().map(|e| e.name.eq_ignore_ascii_case("dl")).unwrap_or(false) {
+        if el == "template"
+            && ctx
+                .open_elements
+                .last()
+                .map(|e| e.name.eq_ignore_ascii_case("dl"))
+                .unwrap_or(false)
+        {
             if let Some(dl) = self.dl_stack.last_mut() {
                 dl.seen_template = true;
             }
@@ -171,8 +185,12 @@ impl Rule for DlRule {
 
         // 5. Child of div in dl
         let is_child_of_div_in_dl = ctx.open_elements.len() >= 2
-            && ctx.open_elements[ctx.open_elements.len() - 1].name.eq_ignore_ascii_case("div")
-            && ctx.open_elements[ctx.open_elements.len() - 2].name.eq_ignore_ascii_case("dl");
+            && ctx.open_elements[ctx.open_elements.len() - 1]
+                .name
+                .eq_ignore_ascii_case("div")
+            && ctx.open_elements[ctx.open_elements.len() - 2]
+                .name
+                .eq_ignore_ascii_case("dl");
 
         if is_child_of_div_in_dl {
             if let Some(dl) = self.dl_stack.last_mut() {
@@ -191,7 +209,10 @@ impl Rule for DlRule {
                         ));
                     } else if !matches!(el.as_str(), "dt" | "dd" | "script" | "template") {
                         msgs.push(VNuMessage::error(
-                            format!("Element “{}” not allowed as child of “div” in this context.", el),
+                            format!(
+                                "Element “{}” not allowed as child of “div” in this context.",
+                                el
+                            ),
                             tag.line,
                             tag.col,
                         ));
@@ -215,7 +236,13 @@ impl Rule for DlRule {
         msgs
     }
 
-    fn on_characters(&mut self, ctx: &ValidationContext, text: &str, line: usize, col: usize) -> Vec<VNuMessage> {
+    fn on_characters(
+        &mut self,
+        ctx: &ValidationContext,
+        text: &str,
+        line: usize,
+        col: usize,
+    ) -> Vec<VNuMessage> {
         let mut msgs = Vec::new();
         if self.in_dt {
             self.current_dt_text.push_str(text);
@@ -231,7 +258,9 @@ impl Rule for DlRule {
                     ));
                 } else if top.name.eq_ignore_ascii_case("div")
                     && ctx.open_elements.len() >= 2
-                    && ctx.open_elements[ctx.open_elements.len() - 2].name.eq_ignore_ascii_case("dl")
+                    && ctx.open_elements[ctx.open_elements.len() - 2]
+                        .name
+                        .eq_ignore_ascii_case("dl")
                 {
                     msgs.push(VNuMessage::error(
                         "Text not allowed in “div” in this context.",
@@ -245,7 +274,13 @@ impl Rule for DlRule {
         msgs
     }
 
-    fn on_end_tag(&mut self, _ctx: &ValidationContext, name: &str, line: usize, col: usize) -> Vec<VNuMessage> {
+    fn on_end_tag(
+        &mut self,
+        _ctx: &ValidationContext,
+        name: &str,
+        line: usize,
+        col: usize,
+    ) -> Vec<VNuMessage> {
         let mut msgs = Vec::new();
 
         if name.eq_ignore_ascii_case("dt") {

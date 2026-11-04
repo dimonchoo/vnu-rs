@@ -47,10 +47,9 @@ fn main() {
     };
 
     let messages_file = upstream_tests.join("messages.json");
-    let content = fs::read_to_string(&messages_file)
-        .expect("Failed to read tests/messages.json");
-    let expected_messages: HashMap<String, String> = serde_json::from_str(&content)
-        .expect("Failed to parse messages.json");
+    let content = fs::read_to_string(&messages_file).expect("Failed to read tests/messages.json");
+    let expected_messages: HashMap<String, String> =
+        serde_json::from_str(&content).expect("Failed to parse messages.json");
 
     let filter = std::env::args().nth(1);
 
@@ -76,15 +75,13 @@ fn main() {
         let file_path = upstream_tests.join(key);
         let src = match fs::read_to_string(&file_path) {
             Ok(s) => s,
-            Err(_) => {
-                match fs::read(&file_path) {
-                    Ok(b) => String::from_utf8_lossy(&b).to_string(),
-                    Err(e) => {
-                        skipped.push(format!("{}: {}", key, e));
-                        continue;
-                    }
+            Err(_) => match fs::read(&file_path) {
+                Ok(b) => String::from_utf8_lossy(&b).to_string(),
+                Err(e) => {
+                    skipped.push(format!("{}: {}", key, e));
+                    continue;
                 }
-            }
+            },
         };
 
         total += 1;
@@ -123,7 +120,12 @@ fn main() {
         }
     }
     if total > 0 {
-        println!("Overall Match: {} / {} ({:.2}%)", matches, total, (matches as f64 / total as f64) * 100.0);
+        println!(
+            "Overall Match: {} / {} ({:.2}%)",
+            matches,
+            total,
+            (matches as f64 / total as f64) * 100.0
+        );
     }
     println!("------------------------------------------------------------");
     for (cat, count) in &cat_total {

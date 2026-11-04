@@ -1,5 +1,5 @@
-use vnu_core::VNuMessage;
 use crate::context::{ElementContext, ValidationContext};
+use vnu_core::VNuMessage;
 
 pub fn check_button_in_select(
     ctx: &ValidationContext,

@@ -1,6 +1,6 @@
-use vnu_core::VNuMessage;
 use crate::context::{ElementContext, ValidationContext};
 use crate::rule::Rule;
+use vnu_core::VNuMessage;
 
 #[derive(Default)]
 pub struct DoctypeRule {

@@ -1,11 +1,11 @@
 pub mod naming;
 pub mod roles;
 
-use vnu_core::VNuMessage;
 use crate::context::{ElementContext, ValidationContext};
 use crate::rule::Rule;
 use naming::is_prohibited_from_being_named;
 use roles::{PROHIBIT_INTERACTIVE_ROLES, VALID_ARIA_ATTRIBUTES, VALID_ARIA_ROLES};
+use vnu_core::VNuMessage;
 
 #[derive(Default)]
 pub struct AriaRule {
@@ -26,7 +26,8 @@ impl Rule for AriaRule {
         let elem_name = &tag.name;
 
         if let Some(target_id) = tag.get_attr("aria-activedescendant") {
-            self.pending_activedescendants.push((target_id.to_string(), tag.line, tag.col));
+            self.pending_activedescendants
+                .push((target_id.to_string(), tag.line, tag.col));
         }
 
         validate_roles(tag, elem_name, &mut msgs);
@@ -58,10 +59,29 @@ impl Rule for AriaRule {
 
 fn validate_roles(tag: &ElementContext, elem_name: &str, msgs: &mut Vec<VNuMessage>) {
     if let Some(role_attr) = tag.get_attr("role") {
+        if role_attr == "presentation" || role_attr == "none" {
+            let has_global_aria = tag
+                .attrs
+                .iter()
+                .any(|(k, _)| k.starts_with("aria-") && !matches!(k.as_str(), "aria-hidden"));
+            if has_global_aria {
+                msgs.push(VNuMessage::warning(
+                    "The “presentation” role does not affect elements that have global ARIA attributes.",
+                    tag.line,
+                    tag.col,
+                ));
+            }
+        }
         for token in role_attr.split_whitespace() {
-            if !VALID_ARIA_ROLES.iter().any(|&r| r.eq_ignore_ascii_case(token)) {
+            if !VALID_ARIA_ROLES
+                .iter()
+                .any(|&r| r.eq_ignore_ascii_case(token))
+            {
                 msgs.push(VNuMessage::error(
-                    format!("Bad value “{}” for attribute “role” on element “{}”.", token, elem_name),
+                    format!(
+                        "Bad value “{}” for attribute “role” on element “{}”.",
+                        token, elem_name
+                    ),
                     tag.line,
                     tag.col,
                 ));
@@ -81,7 +101,8 @@ fn validate_unnecessary_roles(tag: &ElementContext, elem_name: &str, msgs: &mut 
             let input_type = tag.get_attr("type").unwrap_or("text");
             let has_list = tag.has_attr("list");
             if !has_list {
-                if token.eq_ignore_ascii_case("textbox") && input_type.eq_ignore_ascii_case("text") {
+                if token.eq_ignore_ascii_case("textbox") && input_type.eq_ignore_ascii_case("text")
+                {
                     msgs.push(VNuMessage::warning(
                         format!(
                             "The “textbox” role is unnecessary for an “input” element that has no “list” attribute and whose type is “{}”.",
@@ -90,7 +111,9 @@ fn validate_unnecessary_roles(tag: &ElementContext, elem_name: &str, msgs: &mut 
                         tag.line,
                         tag.col,
                     ));
-                } else if token.eq_ignore_ascii_case("searchbox") && input_type.eq_ignore_ascii_case("search") {
+                } else if token.eq_ignore_ascii_case("searchbox")
+                    && input_type.eq_ignore_ascii_case("search")
+                {
                     msgs.push(VNuMessage::warning(
                         format!(
                             "The “searchbox” role is unnecessary for an “input” element that has no “list” attribute and whose type is “{}”.",
@@ -117,7 +140,10 @@ fn validate_unnecessary_roles(tag: &ElementContext, elem_name: &str, msgs: &mut 
             && token.eq_ignore_ascii_case("link")
         {
             msgs.push(VNuMessage::warning(
-                format!("The “link” role is unnecessary for element “{}” with attribute “href”.", elem_name),
+                format!(
+                    "The “link” role is unnecessary for element “{}” with attribute “href”.",
+                    elem_name
+                ),
                 tag.line,
                 tag.col,
             ));
@@ -127,12 +153,16 @@ fn validate_unnecessary_roles(tag: &ElementContext, elem_name: &str, msgs: &mut 
             && token.eq_ignore_ascii_case("rowgroup")
         {
             msgs.push(VNuMessage::warning(
-                format!("The “rowgroup” role is unnecessary for element “{}”.", elem_name),
+                format!(
+                    "The “rowgroup” role is unnecessary for element “{}”.",
+                    elem_name
+                ),
                 tag.line,
                 tag.col,
             ));
         } else if elem_name.eq_ignore_ascii_case("th")
-            && (token.eq_ignore_ascii_case("columnheader") || token.eq_ignore_ascii_case("rowheader"))
+            && (token.eq_ignore_ascii_case("columnheader")
+                || token.eq_ignore_ascii_case("rowheader"))
         {
             msgs.push(VNuMessage::warning(
                 format!("The “{}” role is unnecessary for element “th”.", token),
@@ -149,7 +179,12 @@ fn validate_unnecessary_roles(tag: &ElementContext, elem_name: &str, msgs: &mut 
     }
 }
 
-fn validate_descendant_constraints(ctx: &ValidationContext, tag: &ElementContext, elem_name: &str, msgs: &mut Vec<VNuMessage>) {
+fn validate_descendant_constraints(
+    ctx: &ValidationContext,
+    tag: &ElementContext,
+    elem_name: &str,
+    msgs: &mut Vec<VNuMessage>,
+) {
     if let Some(parent) = ctx.parent() {
         if parent.has_attr_val("role", "list") && tag.has_attr_val("role", "group") {
             msgs.push(VNuMessage::error(
@@ -159,7 +194,10 @@ fn validate_descendant_constraints(ctx: &ValidationContext, tag: &ElementContext
             ));
         }
 
-        if parent.has_attr_val("role", "rowgroup") && !tag.has_attr_val("role", "row") && !elem_name.eq_ignore_ascii_case("tr") {
+        if parent.has_attr_val("role", "rowgroup")
+            && !tag.has_attr_val("role", "row")
+            && !elem_name.eq_ignore_ascii_case("tr")
+        {
             msgs.push(VNuMessage::error(
                 "An element that is a child of an element with “role=rowgroup” must have “role=row”.",
                 tag.line,
@@ -186,7 +224,9 @@ fn validate_descendant_constraints(ctx: &ValidationContext, tag: &ElementContext
 
             if ctx.has_ancestor_role("tree") {
                 let role = tag.get_attr("role").unwrap_or("");
-                let is_treeitem = role.split_whitespace().any(|r| r.eq_ignore_ascii_case("treeitem"));
+                let is_treeitem = role
+                    .split_whitespace()
+                    .any(|r| r.eq_ignore_ascii_case("treeitem"));
                 if !is_treeitem {
                     msgs.push(VNuMessage::error(
                         "An element with “role=group” that is a descendant of an element with “role=tree” must contain only elements with “role=treeitem”.",
@@ -202,7 +242,10 @@ fn validate_descendant_constraints(ctx: &ValidationContext, tag: &ElementContext
     for parent in ctx.open_elements.iter().rev() {
         if let Some(r) = parent.get_attr("role") {
             for role_token in r.split_whitespace() {
-                if PROHIBIT_INTERACTIVE_ROLES.iter().any(|&p| p.eq_ignore_ascii_case(role_token)) {
+                if PROHIBIT_INTERACTIVE_ROLES
+                    .iter()
+                    .any(|&p| p.eq_ignore_ascii_case(role_token))
+                {
                     if elem_name.eq_ignore_ascii_case("a") && tag.has_attr("href") {
                         msgs.push(VNuMessage::warning(
                             format!(
@@ -230,7 +273,12 @@ fn validate_descendant_constraints(ctx: &ValidationContext, tag: &ElementContext
 }
 
 fn validate_naming_rules(tag: &ElementContext, elem_name: &str, msgs: &mut Vec<VNuMessage>) {
-    for label_attr in &["aria-label", "aria-labelledby", "aria-braillelabel", "aria-brailleroledescription"] {
+    for label_attr in &[
+        "aria-label",
+        "aria-labelledby",
+        "aria-braillelabel",
+        "aria-brailleroledescription",
+    ] {
         if tag.has_attr(label_attr) && is_prohibited_from_being_named(elem_name, tag) {
             msgs.push(VNuMessage::error(
                 format!(
@@ -247,7 +295,9 @@ fn validate_naming_rules(tag: &ElementContext, elem_name: &str, msgs: &mut Vec<V
 fn validate_attributes(tag: &ElementContext, elem_name: &str, msgs: &mut Vec<VNuMessage>) {
     if elem_name.eq_ignore_ascii_case("input") {
         let input_type = tag.get_attr("type").unwrap_or("text");
-        if (input_type.eq_ignore_ascii_case("checkbox") || input_type.eq_ignore_ascii_case("radio")) && tag.has_attr("aria-checked") {
+        if (input_type.eq_ignore_ascii_case("checkbox") || input_type.eq_ignore_ascii_case("radio"))
+            && tag.has_attr("aria-checked")
+        {
             msgs.push(VNuMessage::error(
                 format!(
                     "The “aria-checked” attribute must not be used on an “input” element which has a “type” attribute whose value is “{}”.",
@@ -284,7 +334,10 @@ fn validate_attributes(tag: &ElementContext, elem_name: &str, msgs: &mut Vec<VNu
         ));
     }
 
-    if elem_name.eq_ignore_ascii_case("a") && tag.has_attr("href") && tag.has_attr_val("aria-disabled", "true") {
+    if elem_name.eq_ignore_ascii_case("a")
+        && tag.has_attr("href")
+        && tag.has_attr_val("aria-disabled", "true")
+    {
         msgs.push(VNuMessage::warning(
             "An “aria-disabled” attribute whose value is “true” should not be specified on an “a” element that has an “href” attribute.",
             tag.line,
@@ -335,15 +388,27 @@ fn validate_attributes(tag: &ElementContext, elem_name: &str, msgs: &mut Vec<VNu
 
     if tag.has_attr("aria-checked") {
         const ALLOWED_ARIA_CHECKED_ROLES: &[&str] = &[
-            "checkbox", "menuitemcheckbox", "option", "radio", "switch", "treeitem",
+            "checkbox",
+            "menuitemcheckbox",
+            "option",
+            "radio",
+            "switch",
+            "treeitem",
         ];
         let role = tag.get_attr("role").unwrap_or("");
-        let is_allowed_role = role.split_whitespace().any(|r| ALLOWED_ARIA_CHECKED_ROLES.iter().any(|&a| a.eq_ignore_ascii_case(r)));
+        let is_allowed_role = role.split_whitespace().any(|r| {
+            ALLOWED_ARIA_CHECKED_ROLES
+                .iter()
+                .any(|&a| a.eq_ignore_ascii_case(r))
+        });
         let is_native_checkable = elem_name.eq_ignore_ascii_case("input")
             && (tag.has_attr_val("type", "checkbox") || tag.has_attr_val("type", "radio"));
         if !is_allowed_role && !is_native_checkable {
             msgs.push(VNuMessage::error(
-                format!("Attribute “aria-checked” not allowed on element “{}” at this point.", elem_name),
+                format!(
+                    "Attribute “aria-checked” not allowed on element “{}” at this point.",
+                    elem_name
+                ),
                 tag.line,
                 tag.col,
             ));
@@ -353,11 +418,18 @@ fn validate_attributes(tag: &ElementContext, elem_name: &str, msgs: &mut Vec<VNu
     const NO_ARIA_ELEMENTS: &[&str] = &["meta", "base", "head", "html"];
     for (attr_name, _) in &tag.attrs {
         if attr_name.starts_with("aria-")
-            && (NO_ARIA_ELEMENTS.iter().any(|&e| e.eq_ignore_ascii_case(elem_name))
-                || !VALID_ARIA_ATTRIBUTES.iter().any(|&a| a.eq_ignore_ascii_case(attr_name)))
+            && (NO_ARIA_ELEMENTS
+                .iter()
+                .any(|&e| e.eq_ignore_ascii_case(elem_name))
+                || !VALID_ARIA_ATTRIBUTES
+                    .iter()
+                    .any(|&a| a.eq_ignore_ascii_case(attr_name)))
         {
             msgs.push(VNuMessage::error(
-                format!("Attribute “{}” not allowed on element “{}” at this point.", attr_name, elem_name),
+                format!(
+                    "Attribute “{}” not allowed on element “{}” at this point.",
+                    attr_name, elem_name
+                ),
                 tag.line,
                 tag.col,
             ));

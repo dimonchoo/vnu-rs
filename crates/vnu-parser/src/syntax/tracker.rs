@@ -68,10 +68,12 @@ impl SyntaxTracker {
             self.needs_scan = true;
             return;
         }
-        if !s.is_ascii() && s.chars().any(|c| {
-            let u = c as u32;
-            u > 0xFFFF && (u & 0xFFFE) == 0xFFFE
-        }) {
+        if !s.is_ascii()
+            && s.chars().any(|c| {
+                let u = c as u32;
+                u > 0xFFFF && (u & 0xFFFE) == 0xFFFE
+            })
+        {
             self.needs_scan = true;
         }
     }
@@ -83,7 +85,10 @@ impl SyntaxTracker {
 
     #[inline]
     pub fn check_raw_script_step(&mut self, is_script_step: bool, html: &str) {
-        if !self.needs_scan && is_script_step && (html.contains("</src>") || html.contains("</style>")) {
+        if !self.needs_scan
+            && is_script_step
+            && (html.contains("</src>") || html.contains("</style>"))
+        {
             self.needs_scan = true;
         }
     }

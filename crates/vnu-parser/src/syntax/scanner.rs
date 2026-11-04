@@ -1,9 +1,9 @@
-use vnu_core::VNuMessage;
 use super::charrefs;
 use super::comments;
 use super::doctypes;
 use super::eof;
 use super::tags;
+use vnu_core::VNuMessage;
 
 pub fn scan_syntax(src: &str, msgs: &mut Vec<VNuMessage>) {
     let bytes = src.as_bytes();
@@ -27,7 +27,11 @@ pub fn scan_syntax(src: &str, msgs: &mut Vec<VNuMessage>) {
             i += 1;
             continue;
         } else if b == 0x0b {
-            msgs.push(VNuMessage::error("Forbidden code point U+000b.".to_string(), 1, 1));
+            msgs.push(VNuMessage::error(
+                "Forbidden code point U+000b.".to_string(),
+                1,
+                1,
+            ));
             i += 1;
             continue;
         } else if b >= 0xF0 && i + 4 <= len {
@@ -52,7 +56,13 @@ pub fn scan_syntax(src: &str, msgs: &mut Vec<VNuMessage>) {
         // 3. Markup start: '<'
         if b == b'<' {
             if i + 4 <= len && &bytes[i..i + 4] == b"<!--" {
-                let advanced = comments::handle_comment(bytes, i, &mut open_comments, &mut close_comments, msgs);
+                let advanced = comments::handle_comment(
+                    bytes,
+                    i,
+                    &mut open_comments,
+                    &mut close_comments,
+                    msgs,
+                );
                 i += advanced.max(1);
                 continue;
             }
@@ -76,9 +86,15 @@ pub fn scan_syntax(src: &str, msgs: &mut Vec<VNuMessage>) {
 
             // Meta charset after 1024 bytes check
             if i + 5 <= len && &bytes[i..i + 5] == b"<meta" {
-                let tag_end = bytes[i..].iter().position(|&c| c == b'>').unwrap_or(len - i);
+                let tag_end = bytes[i..]
+                    .iter()
+                    .position(|&c| c == b'>')
+                    .unwrap_or(len - i);
                 let tag_bytes = &bytes[i..i + tag_end];
-                if let Some(c_offset) = tag_bytes.windows(7).position(|w| w.eq_ignore_ascii_case(b"charset")) {
+                if let Some(c_offset) = tag_bytes
+                    .windows(7)
+                    .position(|w| w.eq_ignore_ascii_case(b"charset"))
+                {
                     if i + c_offset > 1024 {
                         msgs.push(VNuMessage::error(
                             "A “charset” attribute on a “meta” element found after the first 1024 bytes.".to_string(),

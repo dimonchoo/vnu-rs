@@ -1,13 +1,35 @@
-use vnu_core::VNuMessage;
 use crate::context::{ElementContext, ValidationContext};
+use vnu_core::VNuMessage;
 
 const DISALLOWED_ON_PICTURE: &[&str] = &[
-    "align", "alt", "border", "crossorigin", "height", "hspace", "ismap", "longdesc",
-    "lowsrc", "media", "name", "role", "sizes", "src", "vspace", "width",
+    "align",
+    "alt",
+    "border",
+    "crossorigin",
+    "height",
+    "hspace",
+    "ismap",
+    "longdesc",
+    "lowsrc",
+    "media",
+    "name",
+    "role",
+    "sizes",
+    "src",
+    "vspace",
+    "width",
 ];
 
 const DISALLOWED_ON_SOURCE_IN_PICTURE: &[&str] = &[
-    "align", "alt", "border", "crossorigin", "hspace", "ismap", "longdesc", "role", "vspace",
+    "align",
+    "alt",
+    "border",
+    "crossorigin",
+    "hspace",
+    "ismap",
+    "longdesc",
+    "role",
+    "vspace",
 ];
 
 #[derive(Debug, Clone)]
@@ -25,7 +47,11 @@ pub struct PictureState {
     pub sources: Vec<SourceInfo>,
 }
 
-pub fn handle_picture_open(ctx: &ValidationContext, tag: &ElementContext, msgs: &mut Vec<VNuMessage>) -> PictureState {
+pub fn handle_picture_open(
+    ctx: &ValidationContext,
+    tag: &ElementContext,
+    msgs: &mut Vec<VNuMessage>,
+) -> PictureState {
     if ctx.is_descendant_of("picture") {
         msgs.push(VNuMessage::error(
             "Element “picture” not allowed as child of “picture” in this context.",
@@ -34,9 +60,15 @@ pub fn handle_picture_open(ctx: &ValidationContext, tag: &ElementContext, msgs: 
         ));
     }
     if let Some(parent) = ctx.open_elements.last() {
-        if matches!(parent.name.to_ascii_lowercase().as_str(), "dl" | "ul" | "hgroup" | "rp") {
+        if matches!(
+            parent.name.to_ascii_lowercase().as_str(),
+            "dl" | "ul" | "hgroup" | "rp"
+        ) {
             msgs.push(VNuMessage::error(
-                format!("Element “picture” not allowed as child of “{}” in this context.", parent.name.to_ascii_lowercase()),
+                format!(
+                    "Element “picture” not allowed as child of “{}” in this context.",
+                    parent.name.to_ascii_lowercase()
+                ),
                 tag.line,
                 tag.col,
             ));
@@ -52,7 +84,10 @@ pub fn handle_picture_open(ctx: &ValidationContext, tag: &ElementContext, msgs: 
     for attr in DISALLOWED_ON_PICTURE {
         if tag.has_attr(attr) {
             msgs.push(VNuMessage::error(
-                format!("Attribute “{}” not allowed on element “picture” at this point.", attr),
+                format!(
+                    "Attribute “{}” not allowed on element “picture” at this point.",
+                    attr
+                ),
                 tag.line,
                 tag.col,
             ));
@@ -61,10 +96,18 @@ pub fn handle_picture_open(ctx: &ValidationContext, tag: &ElementContext, msgs: 
     PictureState::default()
 }
 
-pub fn handle_picture_child(state: &mut PictureState, tag: &ElementContext, el: &str, msgs: &mut Vec<VNuMessage>) {
+pub fn handle_picture_child(
+    state: &mut PictureState,
+    tag: &ElementContext,
+    el: &str,
+    msgs: &mut Vec<VNuMessage>,
+) {
     if !matches!(el, "source" | "img" | "script" | "template") {
         msgs.push(VNuMessage::error(
-            format!("Element “{}” not allowed as child of “picture” in this context.", el),
+            format!(
+                "Element “{}” not allowed as child of “picture” in this context.",
+                el
+            ),
             tag.line,
             tag.col,
         ));
@@ -86,7 +129,10 @@ pub fn handle_picture_child(state: &mut PictureState, tag: &ElementContext, el: 
         for attr in DISALLOWED_ON_SOURCE_IN_PICTURE {
             if tag.has_attr(attr) {
                 msgs.push(VNuMessage::error(
-                    format!("Attribute “{}” not allowed on element “source” at this point.", attr),
+                    format!(
+                        "Attribute “{}” not allowed on element “source” at this point.",
+                        attr
+                    ),
                     tag.line,
                     tag.col,
                 ));
@@ -110,6 +156,15 @@ pub fn handle_picture_child(state: &mut PictureState, tag: &ElementContext, el: 
             } else if trimmed.eq_ignore_ascii_case("all") {
                 msgs.push(VNuMessage::error(
                     "Value of “media” attribute here must not be “all”.",
+                    tag.line,
+                    tag.col,
+                ));
+            } else if trimmed.contains(':') && trimmed.ends_with(":)") {
+                msgs.push(VNuMessage::error(
+                    format!(
+                        "Bad value “{}” for attribute “media” on element “source”.",
+                        media
+                    ),
                     tag.line,
                     tag.col,
                 ));

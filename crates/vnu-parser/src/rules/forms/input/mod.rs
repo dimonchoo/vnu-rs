@@ -1,12 +1,12 @@
 pub mod allowed;
 pub mod values;
 
-use vnu_core::VNuMessage;
+use super::types::VALID_INPUT_TYPES;
 use crate::context::{ElementContext, ValidationContext};
 use crate::rule::Rule;
-use super::types::VALID_INPUT_TYPES;
 use allowed::*;
 use values::validate_input_values;
+use vnu_core::VNuMessage;
 
 #[derive(Default)]
 pub struct InputRule {
@@ -104,7 +104,10 @@ impl Rule for InputRule {
                 )
             {
                 msgs.push(VNuMessage::error(
-                    format!("Attribute “{}” not allowed on element “input” at this point.", attr),
+                    format!(
+                        "Attribute “{}” not allowed on element “input” at this point.",
+                        attr
+                    ),
                     tag.line,
                     tag.col,
                 ));
@@ -142,7 +145,10 @@ impl Rule for InputRule {
 
             if !is_attr_allowed_for_type(&attr_lower, effective_type) {
                 msgs.push(VNuMessage::error(
-                    format!("Attribute “{}” not allowed on element “input” at this point.", attr),
+                    format!(
+                        "Attribute “{}” not allowed on element “input” at this point.",
+                        attr
+                    ),
                     tag.line,
                     tag.col,
                 ));
@@ -164,7 +170,10 @@ impl Rule for InputRule {
         }
 
         // Checkbox with role="button" must have aria-pressed
-        if effective_type == "checkbox" && tag.get_attr("role") == Some("button") && tag.get_attr("aria-pressed").is_none() {
+        if effective_type == "checkbox"
+            && tag.get_attr("role") == Some("button")
+            && tag.get_attr("aria-pressed").is_none()
+        {
             msgs.push(VNuMessage::error(
                 "An “input” element with a “type” attribute whose value is “checkbox” and with a “role” attribute whose value is “button” must have an “aria-pressed” attribute.".to_string(),
                 tag.line,
@@ -178,11 +187,13 @@ impl Rule for InputRule {
         // 4. Track list and form references
         if let Some(list_id) = tag.get_attr("list") {
             if is_attr_allowed_for_type("list", effective_type) {
-                self.pending_lists.push((list_id.to_string(), tag.line, tag.col));
+                self.pending_lists
+                    .push((list_id.to_string(), tag.line, tag.col));
             }
         }
         if let Some(form_id) = tag.get_attr("form") {
-            self.pending_forms.push((form_id.to_string(), tag.line, tag.col));
+            self.pending_forms
+                .push((form_id.to_string(), tag.line, tag.col));
         }
 
         msgs

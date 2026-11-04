@@ -1,12 +1,12 @@
 mod server;
 mod service;
 
+use service::validate_content;
 use std::env;
 use std::fs;
 use std::io::{self, Read};
 use std::process;
 use vnu_parser::ValidatorEngine;
-use service::validate_content;
 
 fn print_help() {
     println!(

@@ -1,5 +1,5 @@
+use crate::rules::datatypes::tokens::{UrlValidationResult, validate_url_syntax};
 use vnu_core::VNuMessage;
-use crate::rules::datatypes::tokens::{validate_url_syntax, UrlValidationResult};
 
 fn is_valid_url(s: &str) -> bool {
     let trimmed = s.trim();

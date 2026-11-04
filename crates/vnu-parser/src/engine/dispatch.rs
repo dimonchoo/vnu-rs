@@ -1,111 +1,11 @@
-use std::cell::RefCell;
-use html5ever::tokenizer::states::RawKind;
-use html5ever::tokenizer::{
-    TagKind, Token, TokenSink, TokenSinkResult,
-};
-use vnu_core::{MessageSubType, MessageType, VNuMessage};
 use crate::context::{DocumentMode, ElementContext, LineIndex, ValidationContext};
+use crate::engine::html_stack::{apply_implicit_closures, ensure_in_body_for_tag, is_void_element};
 use crate::engine::scan_policy::ScanPolicy;
 use crate::rule::Rule;
-
-const VOID_ELEMENTS: &[&str] = &[
-    "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source",
-    "track", "wbr",
-];
-
-pub fn is_void_element(name: &str) -> bool {
-    VOID_ELEMENTS.iter().any(|&v| v.eq_ignore_ascii_case(name))
-}
-
-pub fn apply_implicit_closures(open_elements: &mut Vec<ElementContext>, tag_name: &str, is_start_tag: bool) {
-    if is_start_tag {
-        if tag_name.eq_ignore_ascii_case("li") {
-            if let Some(top) = open_elements.last() {
-                if top.name.eq_ignore_ascii_case("li") {
-                    open_elements.pop();
-                }
-            }
-        } else if tag_name.eq_ignore_ascii_case("option") {
-            if let Some(top) = open_elements.last() {
-                if top.name.eq_ignore_ascii_case("option") {
-                    open_elements.pop();
-                }
-            }
-        } else if tag_name.eq_ignore_ascii_case("dt") || tag_name.eq_ignore_ascii_case("dd") {
-            if let Some(top) = open_elements.last() {
-                if top.name.eq_ignore_ascii_case("dt") || top.name.eq_ignore_ascii_case("dd") {
-                    open_elements.pop();
-                }
-            }
-        } else if tag_name.eq_ignore_ascii_case("td") || tag_name.eq_ignore_ascii_case("th") {
-            if let Some(top) = open_elements.last() {
-                if top.name.eq_ignore_ascii_case("td") || top.name.eq_ignore_ascii_case("th") {
-                    open_elements.pop();
-                }
-            }
-        } else if tag_name.eq_ignore_ascii_case("tr") {
-            while let Some(top) = open_elements.last() {
-                if top.name.eq_ignore_ascii_case("td")
-                    || top.name.eq_ignore_ascii_case("th")
-                    || top.name.eq_ignore_ascii_case("tr")
-                {
-                    open_elements.pop();
-                } else {
-                    break;
-                }
-            }
-        } else if tag_name.eq_ignore_ascii_case("p")
-            || ["dl", "div", "ul", "ol", "table", "h1", "h2", "h3", "h4", "h5", "h6",
-                "pre", "blockquote", "form", "hr", "header", "footer", "nav", "section", "article"]
-                .iter()
-                .any(|&e| e.eq_ignore_ascii_case(tag_name))
-        {
-            if let Some(top) = open_elements.last() {
-                if top.name.eq_ignore_ascii_case("p") {
-                    open_elements.pop();
-                }
-            }
-        }
-    } else if tag_name.eq_ignore_ascii_case("ul") || tag_name.eq_ignore_ascii_case("ol") {
-        if let Some(top) = open_elements.last() {
-            if top.name.eq_ignore_ascii_case("li") {
-                open_elements.pop();
-            }
-        }
-    } else if tag_name.eq_ignore_ascii_case("dl") || tag_name.eq_ignore_ascii_case("div") {
-        if let Some(top) = open_elements.last() {
-            if top.name.eq_ignore_ascii_case("dt") || top.name.eq_ignore_ascii_case("dd") {
-                open_elements.pop();
-            }
-        }
-    } else if tag_name.eq_ignore_ascii_case("tr") {
-        if let Some(top) = open_elements.last() {
-            if top.name.eq_ignore_ascii_case("td") || top.name.eq_ignore_ascii_case("th") {
-                open_elements.pop();
-            }
-        }
-    } else if tag_name.eq_ignore_ascii_case("datalist")
-        || tag_name.eq_ignore_ascii_case("select")
-        || tag_name.eq_ignore_ascii_case("optgroup")
-    {
-        if let Some(top) = open_elements.last() {
-            if top.name.eq_ignore_ascii_case("option") {
-                open_elements.pop();
-            }
-        }
-    } else if ["table", "tbody", "thead", "tfoot"].iter().any(|&e| e.eq_ignore_ascii_case(tag_name)) {
-        while let Some(top) = open_elements.last() {
-            if top.name.eq_ignore_ascii_case("td")
-                || top.name.eq_ignore_ascii_case("th")
-                || top.name.eq_ignore_ascii_case("tr")
-            {
-                open_elements.pop();
-            } else {
-                break;
-            }
-        }
-    }
-}
+use html5ever::tokenizer::states::RawKind;
+use html5ever::tokenizer::{TagKind, Token, TokenSink, TokenSinkResult};
+use std::cell::RefCell;
+use vnu_core::{MessageSubType, MessageType, VNuMessage};
 
 pub struct StreamingValidator<'a> {
     pub ctx: ValidationContext<'a>,
@@ -150,11 +50,14 @@ impl<'a> StreamingValidator<'a> {
         let line = line_u64 as usize;
         match token {
             Token::DoctypeToken(d) => {
-                self.scan_policy.tracker.on_doctype(&d, self.ctx.doctype_seen);
+                self.scan_policy
+                    .tracker
+                    .on_doctype(&d, self.ctx.doctype_seen);
                 self.ctx.doctype_seen = true;
                 let name = d.name.as_deref().unwrap_or("");
                 for rule in &mut self.rules {
-                    self.messages.extend(rule.on_doctype(&self.ctx, name, line, 1));
+                    self.messages
+                        .extend(rule.on_doctype(&self.ctx, name, line, 1));
                 }
             }
             Token::TagToken(tag) => {
@@ -169,8 +72,12 @@ impl<'a> StreamingValidator<'a> {
                             .collect();
 
                         let byte_offset = self.line_index.line_offset(line);
-                        self.scan_policy.tracker.on_start_tag(&name_str, &attrs, byte_offset);
-                        if name_str.eq_ignore_ascii_case("script") || name_str.eq_ignore_ascii_case("style") {
+                        self.scan_policy
+                            .tracker
+                            .on_start_tag(&name_str, &attrs, byte_offset);
+                        if name_str.eq_ignore_ascii_case("script")
+                            || name_str.eq_ignore_ascii_case("style")
+                        {
                             self.in_script_or_style = true;
                         }
 
@@ -226,8 +133,14 @@ impl<'a> StreamingValidator<'a> {
                             self.ctx.title_seen = true;
                         }
 
+                        if self.ctx.mode == DocumentMode::Html {
+                            ensure_in_body_for_tag(&mut self.ctx, &name_str, line, col);
+                        }
+
                         if let Some(id) = elem.get_attr("id") {
-                            self.ctx.id_to_tag.insert(id.to_string(), elem.name.to_ascii_lowercase());
+                            self.ctx
+                                .id_to_tag
+                                .insert(id.to_string(), elem.name.to_ascii_lowercase());
                         }
 
                         // Implicit end tags for optional HTML5 elements
@@ -237,7 +150,10 @@ impl<'a> StreamingValidator<'a> {
                             self.messages.extend(rule.on_start_tag(&self.ctx, &elem));
                         }
 
-                        if self.ctx.mode == DocumentMode::Html && tag.self_closing && !is_void_element(&name_str) {
+                        if self.ctx.mode == DocumentMode::Html
+                            && tag.self_closing
+                            && !is_void_element(&name_str)
+                        {
                             self.messages.push(VNuMessage::error(
                                 "Self-closing syntax (“/>”) used on a non-void HTML element. Ignoring the slash and treating as a start tag.",
                                 line,
@@ -249,14 +165,19 @@ impl<'a> StreamingValidator<'a> {
                         }
                     }
                     TagKind::EndTag => {
-                        if name_str.eq_ignore_ascii_case("script") || name_str.eq_ignore_ascii_case("style") {
+                        if name_str.eq_ignore_ascii_case("script")
+                            || name_str.eq_ignore_ascii_case("style")
+                        {
                             self.in_script_or_style = false;
                         }
-                        self.scan_policy.tracker.on_end_tag(&name_str, is_void_element(&name_str));
+                        self.scan_policy
+                            .tracker
+                            .on_end_tag(&name_str, is_void_element(&name_str));
                         if is_void_element(&name_str) {
                             let mut handled = false;
                             for &idx in &self.stray_rule_indices {
-                                let stray = self.rules[idx].on_stray_end_tag(&self.ctx, &name_str, line, col);
+                                let stray = self.rules[idx]
+                                    .on_stray_end_tag(&self.ctx, &name_str, line, col);
                                 if !stray.is_empty() {
                                     self.messages.extend(stray);
                                     handled = true;
@@ -276,9 +197,19 @@ impl<'a> StreamingValidator<'a> {
                         // Implicit closure before closing parent containers
                         apply_implicit_closures(&mut self.ctx.open_elements, &name_str, false);
 
-                        if let Some(pos) = self.ctx.open_elements.iter().rposition(|e| e.name.eq_ignore_ascii_case(&name_str)) {
+                        if let Some(pos) = self
+                            .ctx
+                            .open_elements
+                            .iter()
+                            .rposition(|e| e.name.eq_ignore_ascii_case(&name_str))
+                        {
                             if pos + 1 < self.ctx.open_elements.len() {
-                                let current_open = self.ctx.open_elements.last().map(|e| e.name.as_str()).unwrap_or("");
+                                let current_open = self
+                                    .ctx
+                                    .open_elements
+                                    .last()
+                                    .map(|e| e.name.as_str())
+                                    .unwrap_or("");
                                 self.messages.push(VNuMessage::error(
                                     format!(
                                         "End tag “{}” did not match the name of the current open element (“{}”).",
@@ -290,7 +221,8 @@ impl<'a> StreamingValidator<'a> {
                             }
 
                             for rule in &mut self.rules {
-                                self.messages.extend(rule.on_end_tag(&self.ctx, &name_str, line, col));
+                                self.messages
+                                    .extend(rule.on_end_tag(&self.ctx, &name_str, line, col));
                             }
                             self.ctx.open_elements.truncate(pos);
                         } else if name_str.eq_ignore_ascii_case("p") {
@@ -302,7 +234,8 @@ impl<'a> StreamingValidator<'a> {
                         } else {
                             let mut handled = false;
                             for &idx in &self.stray_rule_indices {
-                                let stray = self.rules[idx].on_stray_end_tag(&self.ctx, &name_str, line, col);
+                                let stray = self.rules[idx]
+                                    .on_stray_end_tag(&self.ctx, &name_str, line, col);
                                 if !stray.is_empty() {
                                     self.messages.extend(stray);
                                     handled = true;
@@ -322,31 +255,44 @@ impl<'a> StreamingValidator<'a> {
             }
             Token::CharacterTokens(text) => {
                 let s: &str = &text;
-                self.scan_policy.tracker.on_characters(s, self.in_script_or_style);
+                self.scan_policy
+                    .tracker
+                    .on_characters(s, self.in_script_or_style);
 
                 for &idx in &self.char_rule_indices {
                     if self.rules[idx].interested_in_characters(&self.ctx) {
-                        self.messages.extend(self.rules[idx].on_characters(&self.ctx, s, line, 1));
+                        self.messages
+                            .extend(self.rules[idx].on_characters(&self.ctx, s, line, 1));
                     }
                 }
             }
             Token::ParseError(err) => {
                 self.scan_policy.tracker.on_parse_error();
-                self.messages.push(VNuMessage::error(err.to_string(), line, 1));
+                self.messages
+                    .push(VNuMessage::error(err.to_string(), line, 1));
             }
             _ => {}
         }
     }
 
-    pub fn finish(mut self) -> (ValidationContext<'a>, Vec<Box<dyn Rule>>, Vec<VNuMessage>, ScanPolicy) {
+    pub fn finish(
+        mut self,
+    ) -> (
+        ValidationContext<'a>,
+        Vec<Box<dyn Rule>>,
+        Vec<VNuMessage>,
+        ScanPolicy,
+    ) {
         for rule in &mut self.rules {
             self.messages.extend(rule.on_finish(&self.ctx));
         }
 
         if let Some(unclosed) = self.ctx.open_elements.iter().find(|e| {
-            !["html", "body", "head", "p", "li", "dt", "dd", "tr", "td", "th"]
-                .iter()
-                .any(|&t| t.eq_ignore_ascii_case(&e.name))
+            ![
+                "html", "body", "head", "p", "li", "dt", "dd", "tr", "td", "th",
+            ]
+            .iter()
+            .any(|&t| t.eq_ignore_ascii_case(&e.name))
         }) {
             self.scan_policy.tracker.needs_scan = true;
             self.messages.push(VNuMessage::error(

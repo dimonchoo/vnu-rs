@@ -1,10 +1,34 @@
 const AUTOCOMPLETE_TYPES: &[&str] = &[
-    "color", "date", "datetime-local", "email", "hidden", "month", "number", "password",
-    "range", "search", "tel", "text", "time", "url", "week",
+    "color",
+    "date",
+    "datetime-local",
+    "email",
+    "hidden",
+    "month",
+    "number",
+    "password",
+    "range",
+    "search",
+    "tel",
+    "text",
+    "time",
+    "url",
+    "week",
 ];
 const LIST_TYPES: &[&str] = &[
-    "color", "date", "datetime-local", "email", "month", "number", "range", "search",
-    "tel", "text", "time", "url", "week",
+    "color",
+    "date",
+    "datetime-local",
+    "email",
+    "month",
+    "number",
+    "range",
+    "search",
+    "tel",
+    "text",
+    "time",
+    "url",
+    "week",
 ];
 const MAXLENGTH_TYPES: &[&str] = &["email", "password", "search", "tel", "text", "url"];
 const MINLENGTH_TYPES: &[&str] = &["email", "password", "search", "tel", "text", "url"];
@@ -13,12 +37,35 @@ const PLACEHOLDER_TYPES: &[&str] = &[
     "email", "number", "password", "search", "tel", "text", "url",
 ];
 const READONLY_TYPES: &[&str] = &[
-    "date", "datetime-local", "email", "month", "number", "password", "search", "tel",
-    "text", "time", "url", "week",
+    "date",
+    "datetime-local",
+    "email",
+    "month",
+    "number",
+    "password",
+    "search",
+    "tel",
+    "text",
+    "time",
+    "url",
+    "week",
 ];
 const REQUIRED_TYPES: &[&str] = &[
-    "checkbox", "date", "datetime-local", "email", "file", "month", "number", "password",
-    "radio", "search", "tel", "text", "time", "url", "week",
+    "checkbox",
+    "date",
+    "datetime-local",
+    "email",
+    "file",
+    "month",
+    "number",
+    "password",
+    "radio",
+    "search",
+    "tel",
+    "text",
+    "time",
+    "url",
+    "week",
 ];
 const SIZE_TYPES: &[&str] = &["email", "password", "search", "tel", "text", "url"];
 

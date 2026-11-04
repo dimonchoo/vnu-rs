@@ -1,11 +1,11 @@
 pub mod picture_context;
 pub mod srcset_sizes;
 
-use vnu_core::VNuMessage;
+use self::picture_context::{PictureState, handle_picture_child, handle_picture_open};
+use self::srcset_sizes::validate_media_attributes;
 use crate::context::{ElementContext, ValidationContext};
 use crate::rule::Rule;
-use self::picture_context::{handle_picture_child, handle_picture_open, PictureState};
-use self::srcset_sizes::validate_media_attributes;
+use vnu_core::VNuMessage;
 
 #[derive(Default)]
 pub struct MediaRule {
@@ -26,10 +26,18 @@ impl Rule for MediaRule {
     }
 
     fn interested_in_characters(&self, ctx: &ValidationContext) -> bool {
-        ctx.open_elements.last().is_some_and(|top| top.name.eq_ignore_ascii_case("picture"))
+        ctx.open_elements
+            .last()
+            .is_some_and(|top| top.name.eq_ignore_ascii_case("picture"))
     }
 
-    fn on_characters(&mut self, _ctx: &ValidationContext, text: &str, line: usize, col: usize) -> Vec<VNuMessage> {
+    fn on_characters(
+        &mut self,
+        _ctx: &ValidationContext,
+        text: &str,
+        line: usize,
+        col: usize,
+    ) -> Vec<VNuMessage> {
         let mut msgs = Vec::new();
         if !text.trim().is_empty() {
             msgs.push(VNuMessage::error(
@@ -94,7 +102,13 @@ impl Rule for MediaRule {
         msgs
     }
 
-    fn on_end_tag(&mut self, _ctx: &ValidationContext, name: &str, line: usize, col: usize) -> Vec<VNuMessage> {
+    fn on_end_tag(
+        &mut self,
+        _ctx: &ValidationContext,
+        name: &str,
+        line: usize,
+        col: usize,
+    ) -> Vec<VNuMessage> {
         let mut msgs = Vec::new();
         if name.eq_ignore_ascii_case("picture") {
             if let Some(state) = self.picture_stack.pop() {

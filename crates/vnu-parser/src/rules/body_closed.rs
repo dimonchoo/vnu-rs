@@ -1,6 +1,6 @@
-use vnu_core::VNuMessage;
 use crate::context::{ElementContext, ValidationContext};
 use crate::rule::Rule;
+use vnu_core::VNuMessage;
 
 #[derive(Default)]
 pub struct BodyClosedRule {
@@ -40,14 +40,26 @@ impl Rule for BodyClosedRule {
         msgs
     }
 
-    fn on_end_tag(&mut self, _ctx: &ValidationContext, name: &str, _line: usize, _col: usize) -> Vec<VNuMessage> {
+    fn on_end_tag(
+        &mut self,
+        _ctx: &ValidationContext,
+        name: &str,
+        _line: usize,
+        _col: usize,
+    ) -> Vec<VNuMessage> {
         if name.eq_ignore_ascii_case("body") {
             self.body_closed = true;
         }
         vec![]
     }
 
-    fn on_stray_end_tag(&mut self, _ctx: &ValidationContext, name: &str, line: usize, col: usize) -> Vec<VNuMessage> {
+    fn on_stray_end_tag(
+        &mut self,
+        _ctx: &ValidationContext,
+        name: &str,
+        line: usize,
+        col: usize,
+    ) -> Vec<VNuMessage> {
         if self.body_closed && !name.eq_ignore_ascii_case("html") {
             vec![VNuMessage::error(
                 "Saw an end tag after “body” had been closed.",
@@ -63,7 +75,13 @@ impl Rule for BodyClosedRule {
         }
     }
 
-    fn on_characters(&mut self, _ctx: &ValidationContext, text: &str, line: usize, col: usize) -> Vec<VNuMessage> {
+    fn on_characters(
+        &mut self,
+        _ctx: &ValidationContext,
+        text: &str,
+        line: usize,
+        col: usize,
+    ) -> Vec<VNuMessage> {
         let mut msgs = Vec::new();
         if self.body_closed && !text.trim().is_empty() {
             msgs.push(VNuMessage::error(

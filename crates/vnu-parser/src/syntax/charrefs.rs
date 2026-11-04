@@ -19,13 +19,20 @@ pub fn handle_charref(bytes: &[u8], idx: usize, _src: &str, msgs: &mut Vec<VNuMe
                 return 3;
             }
             if after_hash.len() == 1 || after_hash[1] == b';' {
-                msgs.push(VNuMessage::error("No digits after “&#x”.".to_string(), 1, 1));
+                msgs.push(VNuMessage::error(
+                    "No digits after “&#x”.".to_string(),
+                    1,
+                    1,
+                ));
                 return 3;
             }
         }
 
         let mut end = idx + 2 + if is_hex { 1 } else { 0 };
-        while end < bytes.len() && ((is_hex && bytes[end].is_ascii_hexdigit()) || (!is_hex && bytes[end].is_ascii_digit())) {
+        while end < bytes.len()
+            && ((is_hex && bytes[end].is_ascii_hexdigit())
+                || (!is_hex && bytes[end].is_ascii_digit()))
+        {
             end += 1;
         }
 
@@ -40,7 +47,11 @@ pub fn handle_charref(bytes: &[u8], idx: usize, _src: &str, msgs: &mut Vec<VNuMe
 
         if let Some(cp) = cp_opt {
             if !has_semi {
-                msgs.push(VNuMessage::error("Character reference was not terminated by a semicolon.".to_string(), 1, 1));
+                msgs.push(VNuMessage::error(
+                    "Character reference was not terminated by a semicolon.".to_string(),
+                    1,
+                    1,
+                ));
             }
             validate_codepoint(cp, msgs);
         }
@@ -60,24 +71,69 @@ pub fn handle_charref(bytes: &[u8], idx: usize, _src: &str, msgs: &mut Vec<VNuMe
 
 fn validate_codepoint(cp: u32, msgs: &mut Vec<VNuMessage>) {
     if cp == 0 {
-        msgs.push(VNuMessage::error("Character reference expands to zero.".to_string(), 1, 1));
+        msgs.push(VNuMessage::error(
+            "Character reference expands to zero.".to_string(),
+            1,
+            1,
+        ));
     } else if cp == 13 {
-        msgs.push(VNuMessage::error("A numeric character reference expanded to carriage return.".to_string(), 1, 1));
+        msgs.push(VNuMessage::error(
+            "A numeric character reference expanded to carriage return.".to_string(),
+            1,
+            1,
+        ));
     } else if (0x80..=0x9F).contains(&cp) {
-        msgs.push(VNuMessage::error("A numeric character reference expanded to the C1 controls range.".to_string(), 1, 1));
+        msgs.push(VNuMessage::error(
+            "A numeric character reference expanded to the C1 controls range.".to_string(),
+            1,
+            1,
+        ));
     } else if (0xD800..=0xDFFF).contains(&cp) {
-        msgs.push(VNuMessage::error("Character reference expands to a surrogate.".to_string(), 1, 1));
+        msgs.push(VNuMessage::error(
+            "Character reference expands to a surrogate.".to_string(),
+            1,
+            1,
+        ));
     } else if cp > 0x10FFFF {
-        msgs.push(VNuMessage::error("Character reference outside the permissible Unicode range.".to_string(), 1, 1));
+        msgs.push(VNuMessage::error(
+            "Character reference outside the permissible Unicode range.".to_string(),
+            1,
+            1,
+        ));
     } else if (0xFDD0..=0xFDEF).contains(&cp) {
-        msgs.push(VNuMessage::error("Character reference expands to a permanently unassigned code point.".to_string(), 1, 1));
+        msgs.push(VNuMessage::error(
+            "Character reference expands to a permanently unassigned code point.".to_string(),
+            1,
+            1,
+        ));
     } else if (cp & 0xFFFE) == 0xFFFE || (cp & 0xFFFF) == 0xFFFF {
         if cp > 0xFFFF {
-            msgs.push(VNuMessage::error(format!("Character reference expands to an astral non-character (U+{:x}).", cp), 1, 1));
+            msgs.push(VNuMessage::error(
+                format!(
+                    "Character reference expands to an astral non-character (U+{:x}).",
+                    cp
+                ),
+                1,
+                1,
+            ));
         } else {
-            msgs.push(VNuMessage::error(format!("Character reference expands to a non-character (U+{:x}).", cp), 1, 1));
+            msgs.push(VNuMessage::error(
+                format!(
+                    "Character reference expands to a non-character (U+{:x}).",
+                    cp
+                ),
+                1,
+                1,
+            ));
         }
     } else if (cp < 0x20 && cp != 9 && cp != 10 && cp != 12 && cp != 13) || cp == 0x7F {
-        msgs.push(VNuMessage::error(format!("Character reference expands to a control character (U+{:04x}).", cp), 1, 1));
+        msgs.push(VNuMessage::error(
+            format!(
+                "Character reference expands to a control character (U+{:04x}).",
+                cp
+            ),
+            1,
+            1,
+        ));
     }
 }

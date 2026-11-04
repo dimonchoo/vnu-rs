@@ -27,48 +27,107 @@ pub fn handle_doctype(
         9 + end_dt + 1
     } else {
         if rest.contains("SYSTEM") {
-            msgs.push(VNuMessage::error("End of file inside system identifier.".to_string(), 1, 1));
+            msgs.push(VNuMessage::error(
+                "End of file inside system identifier.".to_string(),
+                1,
+                1,
+            ));
         } else if rest.contains("PUBLIC") {
-            msgs.push(VNuMessage::error("End of file inside public identifier.".to_string(), 1, 1));
+            msgs.push(VNuMessage::error(
+                "End of file inside public identifier.".to_string(),
+                1,
+                1,
+            ));
         } else {
-            msgs.push(VNuMessage::error("End of file inside doctype.".to_string(), 1, 1));
+            msgs.push(VNuMessage::error(
+                "End of file inside doctype.".to_string(),
+                1,
+                1,
+            ));
         }
         bytes.len() - idx
     }
 }
 
 fn validate_doctype_content(dt_content: &str, msgs: &mut Vec<VNuMessage>) {
-    if dt_content.is_empty() || (dt_content.to_ascii_lowercase().starts_with("html") && !dt_content.starts_with(' ')) {
-        msgs.push(VNuMessage::error("Missing space before doctype name.".to_string(), 1, 1));
+    if dt_content.is_empty()
+        || (dt_content.to_ascii_lowercase().starts_with("html") && !dt_content.starts_with(' '))
+    {
+        msgs.push(VNuMessage::error(
+            "Missing space before doctype name.".to_string(),
+            1,
+            1,
+        ));
     }
     if dt_content.contains("PUBLIC") && dt_content.contains("\"\"") {
-        msgs.push(VNuMessage::error("No space between the doctype public and system identifiers.".to_string(), 1, 1));
+        msgs.push(VNuMessage::error(
+            "No space between the doctype public and system identifiers.".to_string(),
+            1,
+            1,
+        ));
     }
     if dt_content.contains("PUBLIC\"") {
-        msgs.push(VNuMessage::error("No space between the doctype “PUBLIC” keyword and the quote.".to_string(), 1, 1));
+        msgs.push(VNuMessage::error(
+            "No space between the doctype “PUBLIC” keyword and the quote.".to_string(),
+            1,
+            1,
+        ));
     }
     if dt_content.contains("SYSTEM\"") {
-        msgs.push(VNuMessage::error("No space between the doctype “SYSTEM” keyword and the quote.".to_string(), 1, 1));
+        msgs.push(VNuMessage::error(
+            "No space between the doctype “SYSTEM” keyword and the quote.".to_string(),
+            1,
+            1,
+        ));
     }
     if dt_content.contains("BOGUS") {
         msgs.push(VNuMessage::error("Bogus doctype.".to_string(), 1, 1));
     }
-    if dt_content.contains("HTML 4.01 Transitional//EN") && dt_content.contains("http://www.w3.org/TR/html4/loose.dtd") {
-        msgs.push(VNuMessage::error("Almost standards mode doctype. Expected “<!DOCTYPE html>”.".to_string(), 1, 1));
+    if dt_content.contains("HTML 4.01 Transitional//EN")
+        && dt_content.contains("http://www.w3.org/TR/html4/loose.dtd")
+    {
+        msgs.push(VNuMessage::error(
+            "Almost standards mode doctype. Expected “<!DOCTYPE html>”.".to_string(),
+            1,
+            1,
+        ));
     }
-    if dt_content.contains("HTML 4.0//EN") || dt_content.contains("HTML 4.01//EN") || dt_content.contains("XHTML 1.0") {
-        msgs.push(VNuMessage::error("Obsolete doctype. Expected “<!DOCTYPE html>”.".to_string(), 1, 1));
+    if dt_content.contains("HTML 4.0//EN")
+        || dt_content.contains("HTML 4.01//EN")
+        || dt_content.contains("XHTML 1.0")
+    {
+        msgs.push(VNuMessage::error(
+            "Obsolete doctype. Expected “<!DOCTYPE html>”.".to_string(),
+            1,
+            1,
+        ));
     }
     if dt_content.contains("PUBLIC") && dt_content.trim_end().ends_with("PUBLIC") {
-        msgs.push(VNuMessage::error("Expected a public identifier but the doctype ended.".to_string(), 1, 1));
+        msgs.push(VNuMessage::error(
+            "Expected a public identifier but the doctype ended.".to_string(),
+            1,
+            1,
+        ));
     }
     if dt_content.contains("SYSTEM") && dt_content.trim_end().ends_with("SYSTEM") {
-        msgs.push(VNuMessage::error("Expected a system identifier but the doctype ended.".to_string(), 1, 1));
+        msgs.push(VNuMessage::error(
+            "Expected a system identifier but the doctype ended.".to_string(),
+            1,
+            1,
+        ));
     }
     if dt_content.contains("PUBLIC") && dt_content.contains('>') {
-        msgs.push(VNuMessage::error("“>” in public identifier.".to_string(), 1, 1));
+        msgs.push(VNuMessage::error(
+            "“>” in public identifier.".to_string(),
+            1,
+            1,
+        ));
     }
     if dt_content.contains("SYSTEM") && dt_content.contains('>') {
-        msgs.push(VNuMessage::error("“>” in system identifier.".to_string(), 1, 1));
+        msgs.push(VNuMessage::error(
+            "“>” in system identifier.".to_string(),
+            1,
+            1,
+        ));
     }
 }

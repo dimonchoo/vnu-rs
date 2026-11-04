@@ -1,7 +1,7 @@
-use std::collections::HashSet;
-use vnu_core::VNuMessage;
 use crate::context::{ElementContext, ValidationContext};
 use crate::rule::Rule;
+use std::collections::HashSet;
+use vnu_core::VNuMessage;
 
 #[derive(Default)]
 pub struct DuplicateIdRule {

@@ -1,13 +1,14 @@
 pub mod dispatch;
+pub mod html_stack;
 pub mod scan_policy;
 
-use std::cell::RefCell;
-use html5ever::tokenizer::{BufferQueue, Tokenizer, TokenizerOpts, TokenizerResult};
-use vnu_core::VNuReport;
+use self::dispatch::{StreamingSink, StreamingValidator};
 use crate::context::LineIndex;
 use crate::rule::Rule;
 use crate::rules::default_rules;
-use self::dispatch::{StreamingSink, StreamingValidator};
+use html5ever::tokenizer::{BufferQueue, Tokenizer, TokenizerOpts, TokenizerResult};
+use std::cell::RefCell;
+use vnu_core::VNuReport;
 
 pub struct ValidatorEngine {
     rules: Vec<Box<dyn Rule>>,
@@ -50,7 +51,9 @@ impl ValidatorEngine {
         // Reclaim rules and messages
         let inner = tok.sink.inner.into_inner();
         let (_ctx, mut rules, messages, mut scan_policy) = inner.finish();
-        scan_policy.tracker.check_raw_script_step(is_script_step, html);
+        scan_policy
+            .tracker
+            .check_raw_script_step(is_script_step, html);
 
         for r in &mut rules {
             r.reset();

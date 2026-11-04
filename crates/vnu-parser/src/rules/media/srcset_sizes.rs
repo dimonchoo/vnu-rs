@@ -1,5 +1,5 @@
-use vnu_core::VNuMessage;
 use crate::context::ElementContext;
+use vnu_core::VNuMessage;
 
 pub fn parse_srcset(val: &str) -> Option<(bool, bool)> {
     let s = val.trim();
@@ -12,7 +12,9 @@ pub fn parse_srcset(val: &str) -> Option<(bool, bool)> {
     if s.contains("/*") || s.contains("*/") {
         return None;
     }
-    if s.chars().any(|c| matches!(c, '{' | '}' | '[' | ']' | '(' | ')' | '|')) {
+    if s.chars()
+        .any(|c| matches!(c, '{' | '}' | '[' | ']' | '(' | ')' | '|'))
+    {
         return None;
     }
 
@@ -104,9 +106,9 @@ pub fn is_valid_sizes(val: &str) -> bool {
     }
     let lower = s.to_ascii_lowercase();
     for bad in &[
-        "deg", "grad", "rad", "turn", "hz", "khz", "ms", "s ", "dpi", "dpcm", "dppx",
-        "%", "default", "inherit", "initial", "foo", "bar", "all and", "all ", "(})",
-        "(123)", "e+", "e-", "-1e",
+        "deg", "grad", "rad", "turn", "hz", "khz", "ms", "s ", "dpi", "dpcm", "dppx", "%",
+        "default", "inherit", "initial", "foo", "bar", "all and", "all ", "(})", "(123)", "e+",
+        "e-", "-1e",
     ] {
         if lower.contains(bad) {
             return false;
@@ -133,8 +135,8 @@ pub fn is_valid_sizes(val: &str) -> bool {
             }
             if !last_tok.contains('(') && !last_tok.ends_with(')') {
                 let is_valid_unit = [
-                    "px", "em", "rem", "vw", "vh", "vmin", "vmax", "cm", "mm", "in", "pt", "pc", "q",
-                    "cqw", "cqh", "cqi", "cqb", "cqmin", "cqmax", "vi", "vb", "auto",
+                    "px", "em", "rem", "vw", "vh", "vmin", "vmax", "cm", "mm", "in", "pt", "pc",
+                    "q", "cqw", "cqh", "cqi", "cqb", "cqmin", "cqmax", "vi", "vb", "auto",
                 ]
                 .iter()
                 .any(|&u| last_tok.to_ascii_lowercase().ends_with(u));
@@ -149,11 +151,24 @@ pub fn is_valid_sizes(val: &str) -> bool {
     true
 }
 
-pub fn validate_media_attributes(tag: &ElementContext, el: &str, is_in_picture: bool, is_in_video_or_audio: bool, msgs: &mut Vec<VNuMessage>) {
+pub fn validate_media_attributes(
+    tag: &ElementContext,
+    el: &str,
+    is_in_picture: bool,
+    is_in_video_or_audio: bool,
+    msgs: &mut Vec<VNuMessage>,
+) {
     // 1. Disallowed srcset on elements where not allowed
-    if matches!(el, "audio" | "link" | "object" | "picture" | "track" | "video" | "image") && tag.has_attr("srcset") {
+    if matches!(
+        el,
+        "audio" | "link" | "object" | "picture" | "track" | "video" | "image"
+    ) && tag.has_attr("srcset")
+    {
         msgs.push(VNuMessage::error(
-            format!("Attribute “srcset” not allowed on element “{}” at this point.", el),
+            format!(
+                "Attribute “srcset” not allowed on element “{}” at this point.",
+                el
+            ),
             tag.line,
             tag.col,
         ));
@@ -162,7 +177,10 @@ pub fn validate_media_attributes(tag: &ElementContext, el: &str, is_in_picture: 
     // 2. Disallowed usemap on picture and source
     if matches!(el, "picture" | "source") && tag.has_attr("usemap") {
         msgs.push(VNuMessage::error(
-            format!("Attribute “usemap” not allowed on element “{}” at this point.", el),
+            format!(
+                "Attribute “usemap” not allowed on element “{}” at this point.",
+                el
+            ),
             tag.line,
             tag.col,
         ));
@@ -196,14 +214,20 @@ pub fn validate_media_attributes(tag: &ElementContext, el: &str, is_in_picture: 
                 has_w = parsed_w;
                 if has_sizes && has_x_or_unadorned {
                     msgs.push(VNuMessage::error(
-                        format!("Bad value “{}” for attribute “srcset” on element “{}”.", ss, el),
+                        format!(
+                            "Bad value “{}” for attribute “srcset” on element “{}”.",
+                            ss, el
+                        ),
                         tag.line,
                         tag.col,
                     ));
                 }
             } else {
                 msgs.push(VNuMessage::error(
-                    format!("Bad value “{}” for attribute “srcset” on element “{}”.", ss, el),
+                    format!(
+                        "Bad value “{}” for attribute “srcset” on element “{}”.",
+                        ss, el
+                    ),
                     tag.line,
                     tag.col,
                 ));
@@ -246,7 +270,10 @@ pub fn validate_media_attributes(tag: &ElementContext, el: &str, is_in_picture: 
                 }
             } else if !is_valid_sizes(sizes_val) {
                 msgs.push(VNuMessage::error(
-                    format!("Bad value “{}” for attribute “sizes” on element “{}”.", sizes_val, el),
+                    format!(
+                        "Bad value “{}” for attribute “sizes” on element “{}”.",
+                        sizes_val, el
+                    ),
                     tag.line,
                     tag.col,
                 ));

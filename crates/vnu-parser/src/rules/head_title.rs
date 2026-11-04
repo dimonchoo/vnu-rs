@@ -1,6 +1,6 @@
-use vnu_core::VNuMessage;
 use crate::context::{ElementContext, ValidationContext};
 use crate::rule::Rule;
+use vnu_core::VNuMessage;
 
 #[derive(Default)]
 pub struct HeadTitleRule {
@@ -20,10 +20,7 @@ impl Rule for HeadTitleRule {
         if ctx.mode == crate::context::DocumentMode::Svg {
             return vec![];
         }
-        if tag.name.eq_ignore_ascii_case("body")
-            && !ctx.title_seen
-            && !self.emitted
-        {
+        if tag.name.eq_ignore_ascii_case("body") && !ctx.title_seen && !self.emitted {
             self.emitted = true;
             return vec![VNuMessage::error(
                 "Element “head” is missing a required instance of child element “title”.",
@@ -40,7 +37,11 @@ impl Rule for HeadTitleRule {
         }
         if !ctx.title_seen && !self.emitted {
             self.emitted = true;
-            let (line, col) = ctx.open_elements.last().map(|e| (e.line, e.col)).unwrap_or((1, 1));
+            let (line, col) = ctx
+                .open_elements
+                .last()
+                .map(|e| (e.line, e.col))
+                .unwrap_or((1, 1));
             return vec![VNuMessage::error(
                 "Element “head” is missing a required instance of child element “title”.",
                 line,

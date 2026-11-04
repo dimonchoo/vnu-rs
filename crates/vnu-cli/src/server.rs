@@ -1,10 +1,10 @@
+use crate::service::validate_content;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
+use std::sync::mpsc::{Receiver, SyncSender, sync_channel};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use vnu_parser::ValidatorEngine;
-use crate::service::validate_content;
 
 const MAX_BODY_SIZE: usize = 10 * 1024 * 1024; // 10 MB limit
 const WORKER_COUNT: usize = 4;
@@ -38,9 +38,18 @@ fn handle_connection(mut stream: TcpStream, engine: &mut ValidatorEngine) {
     let mut line = String::new();
 
     // Cap the request line reading to MAX_HEADER_BYTES + 1
-    match reader.by_ref().take((MAX_HEADER_BYTES + 1) as u64).read_line(&mut line) {
+    match reader
+        .by_ref()
+        .take((MAX_HEADER_BYTES + 1) as u64)
+        .read_line(&mut line)
+    {
         Ok(n) if n > MAX_HEADER_BYTES => {
-            send_response(&mut stream, "431 Request Header Fields Too Large", "text/plain", "Headers Too Large");
+            send_response(
+                &mut stream,
+                "431 Request Header Fields Too Large",
+                "text/plain",
+                "Headers Too Large",
+            );
             return;
         }
         Ok(_) => {}
@@ -76,7 +85,12 @@ fn handle_connection(mut stream: TcpStream, engine: &mut ValidatorEngine) {
             Ok(n) => {
                 total_header_bytes += n;
                 if total_header_bytes > MAX_HEADER_BYTES {
-                    send_response(&mut stream, "431 Request Header Fields Too Large", "text/plain", "Headers Too Large");
+                    send_response(
+                        &mut stream,
+                        "431 Request Header Fields Too Large",
+                        "text/plain",
+                        "Headers Too Large",
+                    );
                     return;
                 }
                 if line.trim().is_empty() {
@@ -103,32 +117,60 @@ fn handle_connection(mut stream: TcpStream, engine: &mut ValidatorEngine) {
 
     if method == "POST" {
         if content_length > MAX_BODY_SIZE {
-            eprintln!("Payload too large: {} bytes (max {})", content_length, MAX_BODY_SIZE);
-            send_response(&mut stream, "413 Payload Too Large", "text/plain", "Payload Too Large");
+            eprintln!(
+                "Payload too large: {} bytes (max {})",
+                content_length, MAX_BODY_SIZE
+            );
+            send_response(
+                &mut stream,
+                "413 Payload Too Large",
+                "text/plain",
+                "Payload Too Large",
+            );
             return;
         }
 
         let mut body = vec![0u8; content_length];
         if let Err(e) = reader.read_exact(&mut body) {
             eprintln!("Failed to read request body: {}", e);
-            send_response(&mut stream, "400 Bad Request", "text/plain", "Failed to read body");
+            send_response(
+                &mut stream,
+                "400 Bad Request",
+                "text/plain",
+                "Failed to read body",
+            );
             return;
         }
 
         let body_str = String::from_utf8_lossy(&body);
         match validate_content(engine, &body_str, false) {
             Ok((_report, json)) => {
-                send_response(&mut stream, "200 OK", "application/json; charset=utf-8", &json);
+                send_response(
+                    &mut stream,
+                    "200 OK",
+                    "application/json; charset=utf-8",
+                    &json,
+                );
             }
             Err(e) => {
                 eprintln!("Internal validation error: {}", e);
-                send_response(&mut stream, "500 Internal Server Error", "text/plain", "Internal Server Error");
+                send_response(
+                    &mut stream,
+                    "500 Internal Server Error",
+                    "text/plain",
+                    "Internal Server Error",
+                );
             }
         }
         return;
     }
 
-    send_response(&mut stream, "405 Method Not Allowed", "text/plain", "Method Not Allowed");
+    send_response(
+        &mut stream,
+        "405 Method Not Allowed",
+        "text/plain",
+        "Method Not Allowed",
+    );
 }
 
 pub fn run_server(port: u16) {
@@ -158,7 +200,10 @@ pub fn run_server(port: u16) {
                             handle_connection(stream, &mut engine);
                         }));
                         if res.is_err() {
-                            eprintln!("Worker {} recovered from panic, resetting engine", worker_id);
+                            eprintln!(
+                                "Worker {} recovered from panic, resetting engine",
+                                worker_id
+                            );
                             engine = ValidatorEngine::default();
                         }
                     }

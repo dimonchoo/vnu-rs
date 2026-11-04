@@ -1,11 +1,11 @@
 pub mod importmap;
 pub mod speculation_rules;
 
-use vnu_core::VNuMessage;
-use crate::context::{ElementContext, ValidationContext};
-use crate::rule::Rule;
 use self::importmap::validate_importmap;
 use self::speculation_rules::validate_speculationrules;
+use crate::context::{ElementContext, ValidationContext};
+use crate::rule::Rule;
+use vnu_core::VNuMessage;
 
 const JAVASCRIPT_MIME_TYPES: &[&str] = &[
     "application/ecmascript",
@@ -28,7 +28,9 @@ const JAVASCRIPT_MIME_TYPES: &[&str] = &[
 
 #[inline]
 fn is_js_mime_type(t: &str) -> bool {
-    JAVASCRIPT_MIME_TYPES.iter().any(|m| m.eq_ignore_ascii_case(t))
+    JAVASCRIPT_MIME_TYPES
+        .iter()
+        .any(|m| m.eq_ignore_ascii_case(t))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -59,7 +61,13 @@ impl Rule for ScriptingRule {
         self.current_script.is_some()
     }
 
-    fn on_characters(&mut self, _ctx: &ValidationContext, text: &str, _line: usize, _col: usize) -> Vec<VNuMessage> {
+    fn on_characters(
+        &mut self,
+        _ctx: &ValidationContext,
+        text: &str,
+        _line: usize,
+        _col: usize,
+    ) -> Vec<VNuMessage> {
         if let Some((_, _, _, ref mut buf)) = self.current_script {
             buf.push_str(text);
         }
@@ -125,11 +133,21 @@ impl Rule for ScriptingRule {
                 ));
             }
             for attr in &[
-                "async", "nomodule", "defer", "crossorigin", "integrity", "referrerpolicy",
-                "fetchpriority", "blocking",
+                "async",
+                "nomodule",
+                "defer",
+                "crossorigin",
+                "integrity",
+                "referrerpolicy",
+                "fetchpriority",
+                "blocking",
             ] {
                 if tag.has_attr(attr) {
-                    let article = if *attr == "async" || *attr == "integrity" { "an" } else { "a" };
+                    let article = if *attr == "async" || *attr == "integrity" {
+                        "an"
+                    } else {
+                        "a"
+                    };
                     msgs.push(VNuMessage::error(
                         format!("A “script” element with “type=importmap” must not have {} “{}” attribute.", article, attr),
                         tag.line,
@@ -138,7 +156,12 @@ impl Rule for ScriptingRule {
                 }
             }
         } else if is_speculation_rules {
-            self.current_script = Some((ScriptKind::SpeculationRules, tag.line, tag.col, String::new()));
+            self.current_script = Some((
+                ScriptKind::SpeculationRules,
+                tag.line,
+                tag.col,
+                String::new(),
+            ));
             if has_src {
                 msgs.push(VNuMessage::error(
                     "A “script” element with a “type” attribute whose value is “speculationrules” must not have a “src” attribute.",
@@ -147,11 +170,21 @@ impl Rule for ScriptingRule {
                 ));
             }
             for attr in &[
-                "nomodule", "async", "defer", "blocking", "crossorigin", "referrerpolicy",
-                "integrity", "fetchpriority",
+                "nomodule",
+                "async",
+                "defer",
+                "blocking",
+                "crossorigin",
+                "referrerpolicy",
+                "integrity",
+                "fetchpriority",
             ] {
                 if tag.has_attr(attr) {
-                    let article = if *attr == "async" || *attr == "integrity" { "an" } else { "a" };
+                    let article = if *attr == "async" || *attr == "integrity" {
+                        "an"
+                    } else {
+                        "a"
+                    };
                     msgs.push(VNuMessage::error(
                         format!("A “script” element with “type=speculationrules” must not have {} “{}” attribute.", article, attr),
                         tag.line,
@@ -168,11 +201,21 @@ impl Rule for ScriptingRule {
                 ));
             }
             for attr in &[
-                "async", "nomodule", "defer", "crossorigin", "integrity", "referrerpolicy",
-                "fetchpriority", "blocking",
+                "async",
+                "nomodule",
+                "defer",
+                "crossorigin",
+                "integrity",
+                "referrerpolicy",
+                "fetchpriority",
+                "blocking",
             ] {
                 if tag.has_attr(attr) {
-                    let article = if *attr == "async" || *attr == "integrity" { "an" } else { "a" };
+                    let article = if *attr == "async" || *attr == "integrity" {
+                        "an"
+                    } else {
+                        "a"
+                    };
                     msgs.push(VNuMessage::error(
                         format!(
                             "A “script” element with a “type” attribute whose value is neither a JavaScript MIME type, “module”, “importmap”, nor “speculationrules” (i.e., a data block) must not have {} “{}” attribute.",
@@ -260,7 +303,13 @@ impl Rule for ScriptingRule {
         msgs
     }
 
-    fn on_end_tag(&mut self, _ctx: &ValidationContext, name: &str, _line: usize, _col: usize) -> Vec<VNuMessage> {
+    fn on_end_tag(
+        &mut self,
+        _ctx: &ValidationContext,
+        name: &str,
+        _line: usize,
+        _col: usize,
+    ) -> Vec<VNuMessage> {
         let mut msgs = Vec::new();
         if !name.eq_ignore_ascii_case("script") {
             return msgs;

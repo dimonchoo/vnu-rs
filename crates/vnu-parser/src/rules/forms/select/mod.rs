@@ -1,12 +1,12 @@
 pub mod customizable;
 pub mod options;
 
-use vnu_core::VNuMessage;
+use self::customizable::{check_button_in_select, check_selectedcontent};
+use self::options::check_option_start;
 use crate::context::{ElementContext, ValidationContext};
 use crate::rule::Rule;
 use crate::rules::datatypes::tokens::is_valid_autocomplete;
-use self::customizable::{check_button_in_select, check_selectedcontent};
-use self::options::check_option_start;
+use vnu_core::VNuMessage;
 
 #[derive(Default)]
 pub struct SelectState {
@@ -143,7 +143,10 @@ impl Rule for SelectRule {
             if let Some(ac) = tag.get_attr("autocomplete") {
                 if !is_valid_autocomplete(ac) {
                     msgs.push(VNuMessage::error(
-                        format!("Bad value “{}” for attribute “autocomplete” on element “select”.", ac),
+                        format!(
+                            "Bad value “{}” for attribute “autocomplete” on element “select”.",
+                            ac
+                        ),
                         tag.line,
                         tag.col,
                     ));
@@ -158,7 +161,8 @@ impl Rule for SelectRule {
             }
 
             if let Some(role) = tag.get_attr("role") {
-                if role.eq_ignore_ascii_case("combobox") && !has_multiple && !size_greater_than_one {
+                if role.eq_ignore_ascii_case("combobox") && !has_multiple && !size_greater_than_one
+                {
                     msgs.push(VNuMessage::warning(
                         "The “combobox” role is unnecessary for element “select” without a “multiple” attribute and without a “size” attribute whose value is greater than 1.",
                         tag.line,
@@ -203,7 +207,9 @@ impl Rule for SelectRule {
                     state.first_option_valid_placeholder = state.current_option_has_empty_val
                         || state.current_option_text.trim().is_empty();
                 }
-            } else if !self.standalone_option_has_label && self.standalone_option_text.trim().is_empty() {
+            } else if !self.standalone_option_has_label
+                && self.standalone_option_text.trim().is_empty()
+            {
                 msgs.push(VNuMessage::error(
                     "Element “option” without attribute “label” must not be empty.",
                     self.standalone_option_line,

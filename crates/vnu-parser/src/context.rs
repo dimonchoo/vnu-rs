@@ -73,7 +73,10 @@ pub struct ElementContext {
 
 impl ElementContext {
     pub fn get_attr(&self, name: &str) -> Option<&str> {
-        self.attrs.iter().find(|(k, _)| k.eq_ignore_ascii_case(name)).map(|(_, v)| v.as_str())
+        self.attrs
+            .iter()
+            .find(|(k, _)| k.eq_ignore_ascii_case(name))
+            .map(|(_, v)| v.as_str())
     }
 
     pub fn has_attr(&self, name: &str) -> bool {
@@ -125,13 +128,18 @@ impl<'a> ValidationContext<'a> {
     pub fn has_ancestor_role(&self, role_name: &str) -> bool {
         self.open_elements.iter().rev().any(|e| {
             e.get_attr("role")
-                .map(|r| r.split_whitespace().any(|token| token.eq_ignore_ascii_case(role_name)))
+                .map(|r| {
+                    r.split_whitespace()
+                        .any(|token| token.eq_ignore_ascii_case(role_name))
+                })
                 .unwrap_or(false)
         })
     }
 
     pub fn is_descendant_of(&self, tag_name: &str) -> bool {
-        self.open_elements.iter().any(|elem| elem.name.eq_ignore_ascii_case(tag_name))
+        self.open_elements
+            .iter()
+            .any(|elem| elem.name.eq_ignore_ascii_case(tag_name))
     }
 
     pub fn parent(&self) -> Option<&ElementContext> {

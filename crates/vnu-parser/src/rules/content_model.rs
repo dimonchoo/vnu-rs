@@ -1,6 +1,6 @@
-use vnu_core::VNuMessage;
 use crate::context::{ElementContext, ValidationContext};
 use crate::rule::Rule;
+use vnu_core::VNuMessage;
 
 fn allowed_parents(tag_name: &str) -> Option<&'static [&'static str]> {
     match tag_name {
@@ -30,7 +30,11 @@ impl Rule for ContentModelRule {
         if let Some(expected_parents) = allowed_parents(&name_lower) {
             let parent_opt = ctx.parent();
             let mut parent_matches = parent_opt
-                .map(|p| expected_parents.iter().any(|&exp| exp.eq_ignore_ascii_case(&p.name)))
+                .map(|p| {
+                    expected_parents
+                        .iter()
+                        .any(|&exp| exp.eq_ignore_ascii_case(&p.name))
+                })
                 .unwrap_or(false);
 
             if !parent_matches
@@ -45,7 +49,7 @@ impl Rule for ContentModelRule {
                 let parent_name = parent_opt.map(|p| p.name.as_str()).unwrap_or("body");
                 return vec![VNuMessage::error(
                     format!(
-                        "Element “{}” not allowed as child of element “{}” in this context. (Suppressing further errors from this subtree.)",
+                        "Element “{}” not allowed as child of “{}” in this context.",
                         name_lower, parent_name
                     ),
                     tag.line,

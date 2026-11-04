@@ -1,18 +1,19 @@
 pub mod temporal;
 pub mod tokens;
 
-use vnu_core::{MessageType, MessageSubType, VNuMessage};
 use crate::context::{ElementContext, ValidationContext};
 use crate::rule::Rule;
 use temporal::*;
 use tokens::*;
-
-
+use vnu_core::{MessageSubType, MessageType, VNuMessage};
 
 #[inline]
 fn bad_value_error(val: &str, attr: &str, el: &str, line: usize, col: usize) -> VNuMessage {
     VNuMessage::error(
-        format!("Bad value “{}” for attribute “{}” on element “{}”.", val, attr, el),
+        format!(
+            "Bad value “{}” for attribute “{}” on element “{}”.",
+            val, attr, el
+        ),
         line,
         col,
     )
@@ -21,7 +22,10 @@ fn bad_value_error(val: &str, attr: &str, el: &str, line: usize, col: usize) -> 
 #[inline]
 fn bad_value_warning(val: &str, attr: &str, el: &str, line: usize, col: usize) -> VNuMessage {
     VNuMessage::warning(
-        format!("Bad value “{}” for attribute “{}” on element “{}”.", val, attr, el),
+        format!(
+            "Bad value “{}” for attribute “{}” on element “{}”.",
+            val, attr, el
+        ),
         line,
         col,
     )
@@ -117,7 +121,10 @@ impl Rule for DatatypesRule {
 
         // 4b. Popover global attribute: "" | "auto" | "manual"
         if let Some(popover) = tag.get_attr("popover") {
-            if !matches!(popover.to_ascii_lowercase().as_str(), "" | "auto" | "manual") {
+            if !matches!(
+                popover.to_ascii_lowercase().as_str(),
+                "" | "auto" | "manual"
+            ) {
                 msgs.push(bad_value_error(popover, "popover", &el, tag.line, tag.col));
             }
         }
@@ -173,7 +180,36 @@ impl Rule for DatatypesRule {
             }
         }
         if let Some(itemtype) = tag.get_attr("itemtype") {
-            check_url_attr(itemtype, "itemtype", &el, tag.line, tag.col, &mut msgs);
+            if !tag.has_attr("itemscope") {
+                msgs.push(VNuMessage::error(
+                    "The “itemtype” attribute must not be specified on elements that do not have an “itemscope” attribute specified.",
+                    tag.line,
+                    tag.col,
+                ));
+            }
+            let mut bad = false;
+            for token in itemtype.split_whitespace() {
+                let has_scheme = if let Some(pos) = token.find(':') {
+                    let prefix = &token[..pos];
+                    !prefix.is_empty()
+                        && prefix
+                            .chars()
+                            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.'))
+                        && !token[..pos].contains(['/', '?', '#'])
+                } else {
+                    false
+                };
+                if !has_scheme {
+                    msgs.push(bad_value_error(
+                        itemtype, "itemtype", &el, tag.line, tag.col,
+                    ));
+                    bad = true;
+                    break;
+                }
+            }
+            if !bad {
+                check_url_attr(itemtype, "itemtype", &el, tag.line, tag.col, &mut msgs);
+            }
         }
         if let Some(itemid) = tag.get_attr("itemid") {
             check_url_attr(itemid, "itemid", &el, tag.line, tag.col, &mut msgs);
@@ -194,6 +230,11 @@ impl Rule for DatatypesRule {
                 if let Some(max) = tag.get_attr("max") {
                     if !is_valid_positive_float(max) {
                         msgs.push(bad_value_error(max, "max", "progress", tag.line, tag.col));
+                    }
+                }
+                if let Some(val) = tag.get_attr("value") {
+                    if !is_valid_float(val) || val.trim().parse::<f64>().is_ok_and(|v| v < 0.0) {
+                        msgs.push(bad_value_error(val, "value", "progress", tag.line, tag.col));
                     }
                 }
             }
@@ -221,7 +262,13 @@ impl Rule for DatatypesRule {
             "button" => {
                 if let Some(fa) = tag.get_attr("formaction") {
                     if fa.trim().is_empty() {
-                        msgs.push(bad_value_error(fa, "formaction", "button", tag.line, tag.col));
+                        msgs.push(bad_value_error(
+                            fa,
+                            "formaction",
+                            "button",
+                            tag.line,
+                            tag.col,
+                        ));
                     } else {
                         check_url_attr(fa, "formaction", "button", tag.line, tag.col, &mut msgs);
                     }
@@ -237,7 +284,13 @@ impl Rule for DatatypesRule {
                             && token.len() > 10
                     });
                     if !valid || integrity.trim().is_empty() {
-                        msgs.push(bad_value_error(integrity, "integrity", "script", tag.line, tag.col));
+                        msgs.push(bad_value_error(
+                            integrity,
+                            "integrity",
+                            "script",
+                            tag.line,
+                            tag.col,
+                        ));
                     }
                 }
             }
@@ -252,9 +305,13 @@ impl Rule for DatatypesRule {
                         }
                     }
                     if invalid {
-                        msgs.push(bad_value_error(sandbox, "sandbox", "iframe", tag.line, tag.col));
+                        msgs.push(bad_value_error(
+                            sandbox, "sandbox", "iframe", tag.line, tag.col,
+                        ));
                     } else if seen.contains("allow-scripts") && seen.contains("allow-same-origin") {
-                        msgs.push(bad_value_warning(sandbox, "sandbox", "iframe", tag.line, tag.col));
+                        msgs.push(bad_value_warning(
+                            sandbox, "sandbox", "iframe", tag.line, tag.col,
+                        ));
                     }
                 }
             }
@@ -267,7 +324,9 @@ impl Rule for DatatypesRule {
                     if let Some(idx) = pos {
                         let charset_part = content[idx + 8..].trim();
                         if charset_part.is_empty() {
-                            msgs.push(bad_value_error(content, "content", "meta", tag.line, tag.col));
+                            msgs.push(bad_value_error(
+                                content, "content", "meta", tag.line, tag.col,
+                            ));
                         } else if charset_part.eq_ignore_ascii_case("not-a-charset") {
                             msgs.push(VNuMessage {
                                 msg_type: MessageType::Error,

@@ -130,6 +130,16 @@ pub fn is_valid_datetime_local(val: &str) -> bool {
     is_valid_date(date_part) && is_valid_time(time_part)
 }
 
+fn is_valid_timezone_offset(tz: &str) -> bool {
+    let parts: Vec<&str> = tz.split(':').collect();
+    if parts.len() == 2 {
+        if let (Ok(h), Ok(m)) = (parts[0].parse::<u32>(), parts[1].parse::<u32>()) {
+            return parts[0].len() == 2 && parts[1].len() == 2 && h <= 23 && m <= 59;
+        }
+    }
+    false
+}
+
 // Time element datetime attribute: accepts date, time, datetime, duration, etc.
 pub fn is_valid_time_datetime(val: &str) -> bool {
     let s = val.trim();
@@ -150,13 +160,13 @@ pub fn is_valid_time_datetime(val: &str) -> bool {
             return true;
         }
     }
-    if let Some((base, _tz)) = s.rsplit_once('+') {
-        if is_valid_datetime_local(base) {
+    if let Some((base, tz)) = s.rsplit_once('+') {
+        if is_valid_timezone_offset(tz) && is_valid_datetime_local(base) {
             return true;
         }
     }
-    if let Some((base, _tz)) = s.rsplit_once('-') {
-        if base.len() >= 10 && is_valid_datetime_local(base) {
+    if let Some((base, tz)) = s.rsplit_once('-') {
+        if base.len() >= 10 && is_valid_timezone_offset(tz) && is_valid_datetime_local(base) {
             return true;
         }
     }

@@ -3,9 +3,28 @@ use crate::context::ElementContext;
 pub const VALID_BUTTON_TYPES: &[&str] = &["submit", "reset", "button"];
 
 pub const VALID_INPUT_TYPES: &[&str] = &[
-    "button", "checkbox", "color", "date", "datetime-local", "email", "file", "hidden",
-    "image", "month", "number", "password", "radio", "range", "reset", "search", "submit",
-    "tel", "text", "time", "url", "week",
+    "button",
+    "checkbox",
+    "color",
+    "date",
+    "datetime-local",
+    "email",
+    "file",
+    "hidden",
+    "image",
+    "month",
+    "number",
+    "password",
+    "radio",
+    "range",
+    "reset",
+    "search",
+    "submit",
+    "tel",
+    "text",
+    "time",
+    "url",
+    "week",
 ];
 
 #[inline]

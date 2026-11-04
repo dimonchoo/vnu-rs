@@ -90,15 +90,27 @@ impl VNuReport {
     }
 
     pub fn is_valid(&self) -> bool {
-        !self.messages.iter().any(|m| m.msg_type == MessageType::Error || m.msg_type == MessageType::NonDocumentError)
+        !self.messages.iter().any(|m| {
+            m.msg_type == MessageType::Error || m.msg_type == MessageType::NonDocumentError
+        })
     }
 
     pub fn error_count(&self) -> usize {
-        self.messages.iter().filter(|m| m.msg_type == MessageType::Error || m.msg_type == MessageType::NonDocumentError).count()
+        self.messages
+            .iter()
+            .filter(|m| {
+                m.msg_type == MessageType::Error || m.msg_type == MessageType::NonDocumentError
+            })
+            .count()
     }
 
     pub fn warning_count(&self) -> usize {
-        self.messages.iter().filter(|m| m.msg_type == MessageType::Info && m.sub_type == Some(MessageSubType::Warning)).count()
+        self.messages
+            .iter()
+            .filter(|m| {
+                m.msg_type == MessageType::Info && m.sub_type == Some(MessageSubType::Warning)
+            })
+            .count()
     }
 }
 
@@ -135,7 +147,8 @@ mod tests {
           ]
         }"#;
 
-        let report: VNuReport = serde_json::from_str(sample).expect("failed to deserialize official vnu report");
+        let report: VNuReport =
+            serde_json::from_str(sample).expect("failed to deserialize official vnu report");
         assert_eq!(report.messages.len(), 2);
         assert_eq!(report.messages[0].msg_type, MessageType::Error);
         assert_eq!(report.messages[0].last_line, Some(1));

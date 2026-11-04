@@ -1,5 +1,5 @@
-use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use vnu_core::VNuReport;
 use vnu_parser::ValidatorEngine;
 
@@ -98,9 +98,10 @@ impl OracleHarness {
         for l_msg in &local_report.messages {
             let l_str = l_msg.message.as_str();
             if !oracle_set.contains(l_str)
-                && !oracle_report.messages.iter().any(|o| {
-                    o.message.contains(l_str) || l_str.contains(&o.message)
-                })
+                && !oracle_report
+                    .messages
+                    .iter()
+                    .any(|o| o.message.contains(l_str) || l_str.contains(&o.message))
             {
                 extra.push(l_msg.message.clone());
             }
@@ -129,7 +130,10 @@ mod tests {
         let test_html = "<!DOCTYPE html><html lang=\"en\"><head><title>Test</title></head><body><p>Hello</p></body></html>";
         match harness.compare(test_html) {
             Ok(diff) => {
-                println!("Valid snippet -> Oracle valid={}, Local valid={}", diff.oracle_valid, diff.local_valid);
+                println!(
+                    "Valid snippet -> Oracle valid={}, Local valid={}",
+                    diff.oracle_valid, diff.local_valid
+                );
                 assert_eq!(diff.oracle_valid, diff.local_valid);
             }
             Err(e) => {
@@ -144,13 +148,19 @@ mod tests {
         let test_html = "<html><body><img src='test.png'><a href='#'><a>nested</a></a></div>";
         match harness.compare(test_html) {
             Ok(diff) => {
-                println!("Invalid snippet -> Oracle errors: {}, Local errors: {}", diff.oracle_error_count, diff.local_error_count);
+                println!(
+                    "Invalid snippet -> Oracle errors: {}, Local errors: {}",
+                    diff.oracle_error_count, diff.local_error_count
+                );
                 println!("Matched rules: {:?}", diff.matched_rules);
                 println!("Missing in local: {:?}", diff.missing_in_local);
                 println!("Extra in local: {:?}", diff.extra_in_local);
                 assert!(!diff.oracle_valid);
                 assert!(!diff.local_valid);
-                assert!(!diff.matched_rules.is_empty(), "Must match at least one official rule!");
+                assert!(
+                    !diff.matched_rules.is_empty(),
+                    "Must match at least one official rule!"
+                );
             }
             Err(e) => {
                 panic!("Oracle check failed: {:?}", e);
@@ -168,7 +178,11 @@ mod tests {
                 println!("Missing in local: {:?}", diff.missing_in_local);
                 assert!(!diff.oracle_valid);
                 assert!(!diff.local_valid);
-                assert!(diff.matched_rules.iter().any(|m| m.contains("Nested forms are not allowed")));
+                assert!(
+                    diff.matched_rules
+                        .iter()
+                        .any(|m| m.contains("Nested forms are not allowed"))
+                );
                 assert!(diff.matched_rules.iter().any(|m| m.contains("center")));
                 assert!(diff.matched_rules.iter().any(|m| m.contains("font")));
             }
@@ -188,8 +202,16 @@ mod tests {
                 println!("Missing in local: {:?}", diff.missing_in_local);
                 assert!(!diff.oracle_valid);
                 assert!(!diff.local_valid);
-                assert!(diff.matched_rules.iter().any(|m| m.contains("Bad value “invalid_role” for attribute “role”")));
-                assert!(diff.matched_rules.iter().any(|m| m.contains("Attribute “aria-fake” not allowed")));
+                assert!(
+                    diff.matched_rules
+                        .iter()
+                        .any(|m| m.contains("Bad value “invalid_role” for attribute “role”"))
+                );
+                assert!(
+                    diff.matched_rules
+                        .iter()
+                        .any(|m| m.contains("Attribute “aria-fake” not allowed"))
+                );
             }
             Err(e) => {
                 panic!("Oracle check failed: {:?}", e);
@@ -210,7 +232,11 @@ mod tests {
                 assert!(diff.matched_rules.iter().any(|m| m.contains("base")));
                 assert!(diff.matched_rules.iter().any(|m| m.contains("charset")));
                 assert!(diff.matched_rules.iter().any(|m| m.contains("link")));
-                assert!(diff.matched_rules.iter().any(|m| m.contains("End tag “svg” did not match")));
+                assert!(
+                    diff.matched_rules
+                        .iter()
+                        .any(|m| m.contains("End tag “svg” did not match"))
+                );
             }
             Err(e) => {
                 panic!("Oracle check failed: {:?}", e);
@@ -224,9 +250,16 @@ mod tests {
         let valid_svg = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='40'/></svg>";
         match harness.compare(valid_svg) {
             Ok(diff) => {
-                println!("SVG valid diff -> Oracle valid={}, Local valid={}", diff.oracle_valid, diff.local_valid);
+                println!(
+                    "SVG valid diff -> Oracle valid={}, Local valid={}",
+                    diff.oracle_valid, diff.local_valid
+                );
                 assert_eq!(diff.oracle_valid, diff.local_valid);
-                assert!(diff.matched_rules.iter().any(|m| m.contains("preset for SVG")));
+                assert!(
+                    diff.matched_rules
+                        .iter()
+                        .any(|m| m.contains("preset for SVG"))
+                );
             }
             Err(e) => {
                 panic!("Oracle check failed: {:?}", e);
@@ -236,9 +269,16 @@ mod tests {
         let missing_ns_svg = "<svg viewBox='0 0 100 100'><circle cx='50' cy='50' r='40'/></svg>";
         match harness.compare(missing_ns_svg) {
             Ok(diff) => {
-                println!("SVG missing ns diff -> Oracle valid={}, Local valid={}", diff.oracle_valid, diff.local_valid);
+                println!(
+                    "SVG missing ns diff -> Oracle valid={}, Local valid={}",
+                    diff.oracle_valid, diff.local_valid
+                );
                 assert_eq!(diff.oracle_valid, diff.local_valid);
-                assert!(diff.matched_rules.iter().any(|m| m.contains("XML document with no namespace")));
+                assert!(
+                    diff.matched_rules
+                        .iter()
+                        .any(|m| m.contains("XML document with no namespace"))
+                );
             }
             Err(e) => {
                 panic!("Oracle check failed: {:?}", e);
