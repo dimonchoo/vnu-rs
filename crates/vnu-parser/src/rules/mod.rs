@@ -1,3 +1,5 @@
+pub mod aria;
+pub mod content_model;
 pub mod doctype;
 pub mod duplicate_id;
 pub mod forms;
@@ -8,6 +10,8 @@ pub mod nesting;
 pub mod obsolete;
 pub mod tables;
 
+pub use aria::AriaRule;
+pub use content_model::ContentModelRule;
 pub use doctype::DoctypeRule;
 pub use duplicate_id::DuplicateIdRule;
 pub use forms::FormsRule;
@@ -31,5 +35,7 @@ pub fn default_rules() -> Vec<Box<dyn Rule>> {
         Box::new(FormsRule::default()),
         Box::new(ObsoleteRule::default()),
         Box::new(TablesRule::default()),
+        Box::new(AriaRule::default()),
+        Box::new(ContentModelRule::default()),
     ]
 }

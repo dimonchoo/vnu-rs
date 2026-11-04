@@ -171,4 +171,23 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn test_aria_differential() {
+        let harness = OracleHarness::default();
+        let test_html = "<!DOCTYPE html><html lang='en'><head><title>T</title></head><body><div role='invalid_role'>div</div><div aria-fake='test'>div</div></body></html>";
+        match harness.compare(test_html) {
+            Ok(diff) => {
+                println!("ARIA diff -> Matched: {:?}", diff.matched_rules);
+                println!("Missing in local: {:?}", diff.missing_in_local);
+                assert!(!diff.oracle_valid);
+                assert!(!diff.local_valid);
+                assert!(diff.matched_rules.iter().any(|m| m.contains("Bad value “invalid_role” for attribute “role”")));
+                assert!(diff.matched_rules.iter().any(|m| m.contains("Attribute “aria-fake” not allowed")));
+            }
+            Err(e) => {
+                panic!("Oracle check failed: {:?}", e);
+            }
+        }
+    }
 }

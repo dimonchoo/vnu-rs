@@ -63,4 +63,16 @@ mod tests {
         assert!(report.messages.iter().any(|m| m.message.contains("The “align” attribute on the “div” element is obsolete")));
         assert!(report.messages.iter().any(|m| m.message.contains("“td” start tag in table body")));
     }
+
+    #[test]
+    fn test_aria_and_content_model() {
+        let mut engine = ValidatorEngine::default();
+        let html = "<!DOCTYPE html><html lang=\"en\"><head><title>T</title></head><body><div role=\"invalid_role\">div</div><div aria-fake=\"test\">div</div><li>stray li</li><source src=\"s.mp4\"></body></html>";
+        let report = engine.validate(html);
+        assert!(!report.is_valid());
+        assert!(report.messages.iter().any(|m| m.message.contains("Bad value “invalid_role” for attribute “role” on element “div”")));
+        assert!(report.messages.iter().any(|m| m.message.contains("Attribute “aria-fake” not allowed on element “div” at this point")));
+        assert!(report.messages.iter().any(|m| m.message.contains("Element “li” not allowed as child of element “body”")));
+        assert!(report.messages.iter().any(|m| m.message.contains("Element “source” not allowed as child of element “body”")));
+    }
 }
