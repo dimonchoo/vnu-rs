@@ -1,8 +1,12 @@
+mod server;
+mod service;
+
 use std::env;
 use std::fs;
 use std::io::{self, Read};
 use std::process;
 use vnu_parser::ValidatorEngine;
+use service::validate_content;
 
 fn print_help() {
     println!(
@@ -11,9 +15,11 @@ fn print_help() {
 USAGE:
     vnu [OPTIONS] <FILE>...
     vnu - (reads from stdin)
+    vnu --server [PORT] (starts HTTP daemon, default: 8889)
 
 OPTIONS:
     --format <text|json>    Output format (default: json)
+    --server [PORT]         Run as an HTTP server matching v.Nu API
     -h, --help              Print this help message
     -v, --version           Print version
 "#
@@ -29,6 +35,15 @@ fn main() {
 
     if args.contains(&"-v".to_string()) || args.contains(&"--version".to_string()) {
         println!("vnu-rs {}", env!("CARGO_PKG_VERSION"));
+        return;
+    }
+
+    if let Some(pos) = args.iter().position(|a| a == "--server") {
+        let port = args
+            .get(pos + 1)
+            .and_then(|p| p.parse::<u16>().ok())
+            .unwrap_or(8889);
+        server::run_server(port);
         return;
     }
 
@@ -71,20 +86,25 @@ fn main() {
             }
         };
 
-        let report = engine.validate(&content);
-        if !report.is_valid() {
-            has_errors = true;
-        }
-
         if is_json {
-            match serde_json::to_string_pretty(&report) {
-                Ok(json) => println!("{}", json),
+            match validate_content(&mut engine, &content, true) {
+                Ok((report, json)) => {
+                    if !report.is_valid() {
+                        has_errors = true;
+                    }
+                    println!("{}", json);
+                }
                 Err(e) => {
-                    eprintln!("Error serializing JSON report: {}", e);
+                    eprintln!("Validation failure for {}: {}", file_path, e);
                     has_errors = true;
                 }
             }
         } else {
+            let report = engine.validate(&content);
+            if !report.is_valid() {
+                has_errors = true;
+            }
+
             if report.messages.is_empty() {
                 println!("{}: The document is valid.", file_path);
             } else {
