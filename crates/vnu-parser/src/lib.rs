@@ -102,4 +102,15 @@ mod tests {
         assert!(!err_report.is_valid());
         assert!(err_report.messages.iter().any(|m| m.message.contains("XML document with no namespace")));
     }
+
+    #[test]
+    fn test_link_relations_and_body_context() {
+        let mut engine = ValidatorEngine::default();
+        let invalid = "<!DOCTYPE html><html lang=\"en\"><head><title>T</title><link rel=\"alternate stylesheet\" href=\"s.css\"><link rel=\"preload\" href=\"f.woff2\" as=\"font\"><link rel=\"preload\" href=\"data.json\" as=\"json\"></head><body><link rel=\"canonical\" href=\"https://example.com/\"></body></html>";
+        let report = engine.validate(invalid);
+        assert!(!report.is_valid());
+        assert!(report.messages.iter().any(|m| m.message.contains("must have a “title” attribute with a non-empty value")));
+        assert!(report.messages.iter().any(|m| m.message.contains("The value “json” is not a valid value for the “as” attribute of a “link” element with “rel=preload”")));
+        assert!(report.messages.iter().any(|m| m.message.contains("must not appear as a descendant of a “body” element")));
+    }
 }

@@ -48,14 +48,6 @@ impl Rule for MetadataRule {
                     ));
                 }
             }
-        } else if name_lower == "link" {
-            if tag.has_attr("rel") && !tag.has_attr("href") && !tag.has_attr("imagesrcset") {
-                msgs.push(VNuMessage::error(
-                    "A “link” element must have an “href” or “imagesrcset” attribute, or both.",
-                    tag.line,
-                    tag.col,
-                ));
-            }
         } else if name_lower == "script" && tag.has_attr("language") {
             msgs.push(VNuMessage::warning(
                 "The “language” attribute on the “script” element is obsolete. Use the “type” attribute instead.",

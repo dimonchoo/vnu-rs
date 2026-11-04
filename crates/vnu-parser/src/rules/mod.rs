@@ -8,6 +8,7 @@ pub mod forms;
 pub mod head_title;
 pub mod html_lang;
 pub mod img_alt;
+pub mod link;
 pub mod lists;
 pub mod media;
 pub mod metadata;
@@ -26,6 +27,7 @@ pub use forms::{FormsRule, InputRule};
 pub use head_title::HeadTitleRule;
 pub use html_lang::HtmlLangRule;
 pub use img_alt::ImgAltRule;
+pub use link::LinkRule;
 pub use lists::DlRule;
 pub use media::MediaRule;
 pub use metadata::MetadataRule;
@@ -56,5 +58,6 @@ pub fn default_rules() -> Vec<Box<dyn Rule>> {
         Box::new(AriaRule::default()),
         Box::new(ContentModelRule),
         Box::new(MetadataRule::default()),
+        Box::new(LinkRule),
     ]
 }
