@@ -209,14 +209,21 @@ impl<'a> StreamingValidator<'a> {
                             self.messages.extend(rule.on_start_tag(&self.ctx, &elem));
                         }
 
-                        if !is_void_element(&name_str) && !tag.self_closing {
+                        if self.ctx.mode == DocumentMode::Html && tag.self_closing && !is_void_element(&name_str) {
+                            self.messages.push(VNuMessage::error(
+                                "Self-closing syntax (“/>”) used on a non-void HTML element. Ignoring the slash and treating as a start tag.",
+                                line,
+                                col,
+                            ));
+                            self.ctx.open_elements.push(elem);
+                        } else if !is_void_element(&name_str) && !tag.self_closing {
                             self.ctx.open_elements.push(elem);
                         }
                     }
                     TagKind::EndTag => {
                         if is_void_element(&name_str) {
                             self.messages.push(VNuMessage::error(
-                                format!("End tag “{}”.", name_str),
+                                format!("Stray end tag “{}”.", name_str),
                                 line,
                                 col,
                             ));
@@ -265,17 +272,16 @@ impl<'a> StreamingValidator<'a> {
             self.messages.extend(rule.on_finish(&self.ctx));
         }
 
-        for unclosed in &self.ctx.open_elements {
-            if !["html", "body", "head", "p", "li", "dt", "dd", "tr", "td", "th"]
+        if let Some(unclosed) = self.ctx.open_elements.iter().find(|e| {
+            !["html", "body", "head", "p", "li", "dt", "dd", "tr", "td", "th"]
                 .iter()
-                .any(|&t| t.eq_ignore_ascii_case(&unclosed.name))
-            {
-                self.messages.push(VNuMessage::error(
-                    format!("End of file seen and there were open elements: “{}”.", unclosed.name),
-                    unclosed.line,
-                    unclosed.col,
-                ));
-            }
+                .any(|&t| t.eq_ignore_ascii_case(&e.name))
+        }) {
+            self.messages.push(VNuMessage::error(
+                "End of file seen and there were open elements.".to_string(),
+                unclosed.line,
+                unclosed.col,
+            ));
         }
 
         (self.ctx, self.rules, self.messages)

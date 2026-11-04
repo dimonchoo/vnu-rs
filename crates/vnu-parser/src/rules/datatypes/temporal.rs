@@ -165,3 +165,134 @@ pub fn is_valid_time_datetime(val: &str) -> bool {
     }
     false
 }
+
+// Datetime attribute on <del> and <ins>: Date (YYYY-MM-DD) or Global Datetime (datetime-tz)
+pub fn is_valid_del_ins_datetime(s: &str) -> bool {
+    if s.len() < 10 || s.len() > 64 || s.trim() != s {
+        return false;
+    }
+    let b = s.as_bytes();
+    if b[4] != b'-' || b[7] != b'-' {
+        return false;
+    }
+    if !b[0..4].iter().all(u8::is_ascii_digit)
+        || !b[5..7].iter().all(u8::is_ascii_digit)
+        || !b[8..10].iter().all(u8::is_ascii_digit)
+    {
+        return false;
+    }
+    let year: i32 = match s[0..4].parse() {
+        Ok(y) => y,
+        Err(_) => return false,
+    };
+    let month: u32 = match s[5..7].parse() {
+        Ok(m) => m,
+        Err(_) => return false,
+    };
+    let day: u32 = match s[8..10].parse() {
+        Ok(d) => d,
+        Err(_) => return false,
+    };
+    if !(1000..=9999).contains(&year)
+        || !(1..=12).contains(&month)
+        || day < 1
+        || day > days_in_month(year, month)
+    {
+        return false;
+    }
+    if s.len() == 10 {
+        return true;
+    }
+    if b[10] != b'T' && b[10] != b' ' {
+        return false;
+    }
+    let rest = &s[11..];
+    if rest.len() < 6 {
+        return false;
+    }
+    let rb = rest.as_bytes();
+    if !rb[0..2].iter().all(u8::is_ascii_digit)
+        || rb[2] != b':'
+        || !rb[3..5].iter().all(u8::is_ascii_digit)
+    {
+        return false;
+    }
+    let h: u32 = match rest[0..2].parse() {
+        Ok(v) if v <= 23 => v,
+        _ => return false,
+    };
+    let m: u32 = match rest[3..5].parse() {
+        Ok(v) if v <= 59 => v,
+        _ => return false,
+    };
+    let _ = (h, m);
+    let mut tail = &rest[5..];
+    if tail.starts_with(':') {
+        if tail.len() < 3 || !tail.as_bytes()[1..3].iter().all(u8::is_ascii_digit) {
+            return false;
+        }
+        let sec: u32 = match tail[1..3].parse() {
+            Ok(v) if v <= 59 => v,
+            _ => return false,
+        };
+        let _ = sec;
+        tail = &tail[3..];
+        if tail.starts_with('.') {
+            tail = &tail[1..];
+            let frac_len = tail.bytes().take_while(u8::is_ascii_digit).count();
+            if !(1..=3).contains(&frac_len) {
+                return false;
+            }
+            tail = &tail[frac_len..];
+        }
+    }
+    if tail == "Z" {
+        return true;
+    }
+    if tail.starts_with('+') || tail.starts_with('-') {
+        let neg = tail.starts_with('-');
+        let tz = &tail[1..];
+        let (tz_h, tz_m) = if tz.len() == 5 && tz.as_bytes()[2] == b':' {
+            if !tz.as_bytes()[0..2].iter().all(u8::is_ascii_digit)
+                || !tz.as_bytes()[3..5].iter().all(u8::is_ascii_digit)
+            {
+                return false;
+            }
+            (
+                tz[0..2].parse::<u32>().unwrap_or(99),
+                tz[3..5].parse::<u32>().unwrap_or(99),
+            )
+        } else if tz.len() == 4 && tz.bytes().all(|c| c.is_ascii_digit()) {
+            (
+                tz[0..2].parse::<u32>().unwrap_or(99),
+                tz[2..4].parse::<u32>().unwrap_or(99),
+            )
+        } else {
+            return false;
+        };
+
+        if neg && tz_h == 0 && tz_m == 0 {
+            return false;
+        }
+        if tz_m > 59 {
+            return false;
+        }
+        if neg && tz_h > 12 {
+            return false;
+        }
+        if !neg && tz_h > 14 {
+            return false;
+        }
+        if neg && tz_h == 12 && tz_m > 0 {
+            return false;
+        }
+        if !neg && tz_h == 14 && tz_m > 0 {
+            return false;
+        }
+        if tz_m != 0 && tz_m != 30 && tz_m != 45 {
+            return false;
+        }
+        return true;
+    }
+    false
+}

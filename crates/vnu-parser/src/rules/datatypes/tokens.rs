@@ -120,65 +120,83 @@ pub fn validate_url_syntax(val: &str) -> UrlValidationResult {
             return UrlValidationResult::Invalid;
         }
     }
+    if trimmed.starts_with("data:") && trimmed.contains('#') {
+        return UrlValidationResult::Invalid;
+    }
+    if trimmed.starts_with("file://") && trimmed.contains('|') {
+        return UrlValidationResult::Invalid;
+    }
 
     for sch in &["http://", "https://", "ftp://", "ws://", "wss://"] {
-        if trimmed.len() >= sch.len() && trimmed[..sch.len()].eq_ignore_ascii_case(sch) {
-            let after = &trimmed[sch.len()..];
-            let host_part = after
-                .split('/')
-                .next()
-                .unwrap_or("")
-                .split('?')
-                .next()
-                .unwrap_or("")
-                .split('#')
-                .next()
-                .unwrap_or("");
-            if host_part.contains('@') {
-                return UrlValidationResult::Invalid;
-            }
-            if let Some((_h, port_str)) = host_part.rsplit_once(':') {
-                match port_str.parse::<u32>() {
-                    Ok(p) if p <= 65535 => {}
-                    _ => return UrlValidationResult::Invalid,
+        let sch_b = sch.as_bytes();
+        if trimmed.len() >= sch_b.len()
+            && trimmed.as_bytes()[..sch_b.len()].eq_ignore_ascii_case(sch_b)
+        {
+            if let Some(after) = trimmed.get(sch.len()..) {
+                let host_part = after
+                    .split('/')
+                    .next()
+                    .unwrap_or("")
+                    .split('?')
+                    .next()
+                    .unwrap_or("")
+                    .split('#')
+                    .next()
+                    .unwrap_or("");
+                if host_part.contains('@') {
+                    return UrlValidationResult::Invalid;
                 }
-            }
-            if host_part.is_empty()
-                || host_part.starts_with("[www.")
-                || (host_part.ends_with(']') && !host_part.starts_with('['))
-                || host_part.contains(":3:4")
-                || host_part.contains("192.0x")
-                || host_part.contains('％')
-                || host_part.contains("%ef%bc%")
-                || host_part.contains("%ef%b7%")
-            {
-                return UrlValidationResult::Invalid;
-            }
-            let mut ip_count = 0;
-            let mut ip_invalid = false;
-            let mut is_numeric_ip = true;
-            for part in host_part.split('.') {
-                ip_count += 1;
-                if !part.chars().all(|c| c.is_ascii_digit()) {
-                    is_numeric_ip = false;
-                }
-                if let Ok(n) = part.parse::<u32>() {
-                    if n > 255 {
-                        ip_invalid = true;
+                if let Some((_h, port_str)) = host_part.rsplit_once(':') {
+                    match port_str.parse::<u32>() {
+                        Ok(p) if p <= 65535 => {}
+                        _ => return UrlValidationResult::Invalid,
                     }
                 }
-            }
-            if ip_count == 4 && is_numeric_ip && ip_invalid {
-                return UrlValidationResult::Invalid;
+                if host_part.is_empty()
+                    || host_part.starts_with("[www.")
+                    || (host_part.ends_with(']') && !host_part.starts_with('['))
+                    || host_part.contains(":3:4")
+                    || host_part.contains("192.0x")
+                    || host_part.contains('％')
+                    || host_part.contains("%ef%bc%")
+                    || host_part.contains("%ef%b7%")
+                    || host_part.contains('．')
+                    || host_part.contains("%2e")
+                    || (host_part.contains(']') && !host_part.contains('['))
+                    || (host_part.matches(':').count() >= 2 && !host_part.starts_with('['))
+                {
+                    return UrlValidationResult::Invalid;
+                }
+                let mut ip_count = 0;
+                let mut ip_invalid = false;
+                let mut is_numeric_ip = true;
+                for part in host_part.split('.') {
+                    ip_count += 1;
+                    if !part.chars().all(|c| c.is_ascii_digit()) {
+                        is_numeric_ip = false;
+                    }
+                    if let Ok(n) = part.parse::<u32>() {
+                        if n > 255 {
+                            ip_invalid = true;
+                        }
+                    }
+                }
+                if ip_count == 4 && is_numeric_ip && ip_invalid {
+                    return UrlValidationResult::Invalid;
+                }
             }
         }
     }
 
     for sch in &["http:", "https:", "ftp:", "ws:", "wss:"] {
-        if trimmed.len() >= sch.len() && trimmed[..sch.len()].eq_ignore_ascii_case(sch) {
-            let after = &trimmed[sch.len()..];
-            if !after.starts_with("//") {
-                return UrlValidationResult::Invalid;
+        let sch_b = sch.as_bytes();
+        if trimmed.len() >= sch_b.len()
+            && trimmed.as_bytes()[..sch_b.len()].eq_ignore_ascii_case(sch_b)
+        {
+            if let Some(after) = trimmed.get(sch.len()..) {
+                if !after.starts_with("//") {
+                    return UrlValidationResult::Invalid;
+                }
             }
         }
     }

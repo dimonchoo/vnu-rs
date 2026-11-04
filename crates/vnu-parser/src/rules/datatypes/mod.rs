@@ -113,6 +113,13 @@ impl Rule for DatatypesRule {
             }
         }
 
+        // 4b. Popover global attribute: "" | "auto" | "manual"
+        if let Some(popover) = tag.get_attr("popover") {
+            if !matches!(popover.to_ascii_lowercase().as_str(), "" | "auto" | "manual") {
+                msgs.push(bad_value_error(popover, "popover", &el, tag.line, tag.col));
+            }
+        }
+
         // 5. Placeholder: string without line breaks (on textarea)
         if el == "textarea" {
             if let Some(ph) = tag.get_attr("placeholder") {
@@ -199,6 +206,22 @@ impl Rule for DatatypesRule {
                 if let Some(dt) = tag.get_attr("datetime") {
                     if !is_valid_time_datetime(dt) {
                         msgs.push(bad_value_error(dt, "datetime", "time", tag.line, tag.col));
+                    }
+                }
+            }
+            "del" | "ins" => {
+                if let Some(dt) = tag.get_attr("datetime") {
+                    if !is_valid_del_ins_datetime(dt) {
+                        msgs.push(bad_value_error(dt, "datetime", &el, tag.line, tag.col));
+                    }
+                }
+            }
+            "button" => {
+                if let Some(fa) = tag.get_attr("formaction") {
+                    if fa.trim().is_empty() {
+                        msgs.push(bad_value_error(fa, "formaction", "button", tag.line, tag.col));
+                    } else {
+                        check_url_attr(fa, "formaction", "button", tag.line, tag.col, &mut msgs);
                     }
                 }
             }
