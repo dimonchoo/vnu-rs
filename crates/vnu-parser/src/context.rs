@@ -71,9 +71,17 @@ impl ElementContext {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum DocumentMode {
+    #[default]
+    Html,
+    Svg,
+}
+
 #[derive(Debug, Default)]
 pub struct ValidationContext<'a> {
     pub source: &'a str,
+    pub mode: DocumentMode,
     pub open_elements: Vec<ElementContext>,
     pub doctype_seen: bool,
     pub html_seen: bool,
@@ -86,6 +94,7 @@ impl<'a> ValidationContext<'a> {
     pub fn new(source: &'a str) -> Self {
         Self {
             source,
+            mode: DocumentMode::Html,
             open_elements: Vec::new(),
             doctype_seen: false,
             html_seen: false,

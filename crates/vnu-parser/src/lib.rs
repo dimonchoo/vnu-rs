@@ -87,4 +87,18 @@ mod tests {
         assert!(report.messages.iter().any(|m| m.message.contains("A “link” element must have an “href” or “imagesrcset” attribute")));
         assert!(report.messages.iter().any(|m| m.message.contains("End tag “svg” did not match the name of the current open element (“path”)")));
     }
+
+    #[test]
+    fn test_svg_standalone_validation() {
+        let mut engine = ValidatorEngine::default();
+        let valid_svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"><circle cx=\"50\" cy=\"50\" r=\"40\"/></svg>";
+        let valid_report = engine.validate(valid_svg);
+        assert!(valid_report.is_valid());
+        assert!(valid_report.messages.iter().any(|m| m.message.contains("Using the preset for SVG")));
+
+        let missing_ns_svg = "<svg viewBox=\"0 0 100 100\"><circle cx=\"50\" cy=\"50\" r=\"40\"/></svg>";
+        let err_report = engine.validate(missing_ns_svg);
+        assert!(!err_report.is_valid());
+        assert!(err_report.messages.iter().any(|m| m.message.contains("XML document with no namespace")));
+    }
 }

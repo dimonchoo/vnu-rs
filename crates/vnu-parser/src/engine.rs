@@ -3,8 +3,8 @@ use html5ever::tokenizer::{
     BufferQueue, TagKind, Token, TokenSink, TokenSinkResult, Tokenizer, TokenizerOpts,
     TokenizerResult,
 };
-use vnu_core::{VNuMessage, VNuReport};
-use crate::context::{ElementContext, LineIndex, ValidationContext};
+use vnu_core::{MessageSubType, MessageType, VNuMessage, VNuReport};
+use crate::context::{DocumentMode, ElementContext, LineIndex, ValidationContext};
 use crate::rule::Rule;
 use crate::rules::default_rules;
 
@@ -21,6 +21,7 @@ struct StreamingValidator<'a> {
     ctx: ValidationContext<'a>,
     rules: Vec<Box<dyn Rule>>,
     messages: Vec<VNuMessage>,
+    first_tag_seen: bool,
 }
 
 impl<'a> StreamingValidator<'a> {
@@ -29,6 +30,7 @@ impl<'a> StreamingValidator<'a> {
             ctx: ValidationContext::new(source),
             rules,
             messages: Vec::new(),
+            first_tag_seen: false,
         }
     }
 
@@ -60,6 +62,40 @@ impl<'a> StreamingValidator<'a> {
                             col,
                             byte_offset: 0,
                         };
+
+                        if !self.first_tag_seen {
+                            self.first_tag_seen = true;
+                            if name_str.eq_ignore_ascii_case("svg") {
+                                self.ctx.mode = DocumentMode::Svg;
+                                if !elem.has_attr("xmlns") {
+                                    self.messages.push(VNuMessage {
+                                        msg_type: MessageType::NonDocumentError,
+                                        sub_type: Some(MessageSubType::Schema),
+                                        message: "XML document with no namespace; cannot determine any schema to use for validation.".into(),
+                                        extract: None,
+                                        last_line: None,
+                                        first_line: None,
+                                        last_column: None,
+                                        first_column: None,
+                                        hilite_start: None,
+                                        hilite_length: None,
+                                    });
+                                } else {
+                                    self.messages.push(VNuMessage {
+                                        msg_type: MessageType::Info,
+                                        sub_type: None,
+                                        message: "Using the preset for SVG + URL + HTML + MathML based on the root namespace.".into(),
+                                        extract: None,
+                                        last_line: None,
+                                        first_line: None,
+                                        last_column: None,
+                                        first_column: None,
+                                        hilite_start: None,
+                                        hilite_length: None,
+                                    });
+                                }
+                            }
+                        }
 
                         if name_str.eq_ignore_ascii_case("html") {
                             self.ctx.html_seen = true;

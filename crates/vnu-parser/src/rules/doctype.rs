@@ -13,6 +13,9 @@ impl Rule for DoctypeRule {
     }
 
     fn on_start_tag(&mut self, ctx: &ValidationContext, tag: &ElementContext) -> Vec<VNuMessage> {
+        if ctx.mode == crate::context::DocumentMode::Svg {
+            return vec![];
+        }
         if !ctx.doctype_seen && !self.emitted {
             self.emitted = true;
             return vec![VNuMessage::error(

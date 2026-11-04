@@ -13,6 +13,9 @@ pub enum MessageType {
 #[serde(rename_all = "lowercase")]
 pub enum MessageSubType {
     Warning,
+    Fatal,
+    Schema,
+    Internal,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

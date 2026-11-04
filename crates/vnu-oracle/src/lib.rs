@@ -38,10 +38,15 @@ impl OracleHarness {
     }
 
     pub fn query_oracle(&self, html: &str) -> Result<VNuReport, Box<dyn std::error::Error>> {
+        let content_type = if html.trim_start().starts_with("<svg") {
+            "image/svg+xml"
+        } else {
+            "text/html; charset=utf-8"
+        };
         let resp = self
             .client
             .post(&self.endpoint)
-            .header("Content-Type", "text/html; charset=utf-8")
+            .header("Content-Type", content_type)
             .header("User-Agent", "vnu-rs-oracle/0.1.0")
             .body(html.to_string())
             .send()?;
@@ -205,6 +210,34 @@ mod tests {
                 assert!(diff.matched_rules.iter().any(|m| m.contains("charset")));
                 assert!(diff.matched_rules.iter().any(|m| m.contains("link")));
                 assert!(diff.matched_rules.iter().any(|m| m.contains("End tag “svg” did not match")));
+            }
+            Err(e) => {
+                panic!("Oracle check failed: {:?}", e);
+            }
+        }
+    }
+
+    #[test]
+    fn test_svg_differential() {
+        let harness = OracleHarness::default();
+        let valid_svg = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='40'/></svg>";
+        match harness.compare(valid_svg) {
+            Ok(diff) => {
+                println!("SVG valid diff -> Oracle valid={}, Local valid={}", diff.oracle_valid, diff.local_valid);
+                assert_eq!(diff.oracle_valid, diff.local_valid);
+                assert!(diff.matched_rules.iter().any(|m| m.contains("preset for SVG")));
+            }
+            Err(e) => {
+                panic!("Oracle check failed: {:?}", e);
+            }
+        }
+
+        let missing_ns_svg = "<svg viewBox='0 0 100 100'><circle cx='50' cy='50' r='40'/></svg>";
+        match harness.compare(missing_ns_svg) {
+            Ok(diff) => {
+                println!("SVG missing ns diff -> Oracle valid={}, Local valid={}", diff.oracle_valid, diff.local_valid);
+                assert_eq!(diff.oracle_valid, diff.local_valid);
+                assert!(diff.matched_rules.iter().any(|m| m.contains("XML document with no namespace")));
             }
             Err(e) => {
                 panic!("Oracle check failed: {:?}", e);
