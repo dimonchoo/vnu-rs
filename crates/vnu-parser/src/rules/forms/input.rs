@@ -351,53 +351,28 @@ impl Rule for InputRule {
         // 4. URL attribute validity for formaction and src
         for attr_name in &["formaction", "src"] {
             if let Some(val) = tag.get_attr(attr_name) {
-                if is_attr_allowed_for_type(attr_name, effective_type) && !is_valid_url(val) {
-                    msgs.push(VNuMessage::error(
-                        format!("Bad value “{}” for attribute “{}” on element “input”.", val, attr_name),
-                        tag.line,
-                        tag.col,
-                    ));
+                if is_attr_allowed_for_type(attr_name, effective_type) {
+                    match validate_url_syntax(val) {
+                        UrlValidationResult::ForbiddenCodePoint(cp) => {
+                            msgs.push(VNuMessage::error(
+                                format!("Forbidden code point U+{:04x}.", cp),
+                                tag.line,
+                                tag.col,
+                            ));
+                        }
+                        UrlValidationResult::Invalid => {
+                            msgs.push(VNuMessage::error(
+                                format!("Bad value “{}” for attribute “{}” on element “input”.", val, attr_name),
+                                tag.line,
+                                tag.col,
+                            ));
+                        }
+                        UrlValidationResult::Valid => {}
+                    }
                 }
             }
         }
 
         msgs
     }
-}
-
-fn is_valid_url(val: &str) -> bool {
-    let trimmed = val.trim_matches(|c: char| " \t\r\n\x0c".contains(c));
-    if trimmed.is_empty() {
-        return false;
-    }
-    if val.contains('\r') || val.contains('\n') || val.contains('\t') || val.contains(' ') {
-        return false;
-    }
-    if trimmed.contains("#\\") || trimmed.contains("# ") {
-        return false;
-    }
-    if let Some((_, frag)) = trimmed.split_once('#') {
-        if frag.contains('#') {
-            return false;
-        }
-    }
-    if trimmed.starts_with("http://[www.") || trimmed.contains(":3:4") {
-        return false;
-    }
-    if trimmed.contains("192.0x") || trimmed.contains("192.168.0.257") {
-        return false;
-    }
-    if trimmed.contains('％') || trimmed.contains("%ef%bc%") || trimmed.contains("%ef%b7%") {
-        return false;
-    }
-    if trimmed == "http://"
-        || trimmed.starts_with("http://@")
-        || trimmed.starts_with("http://user:pass@/")
-    {
-        return false;
-    }
-    if trimmed.ends_with('%') || trimmed.contains("/ /") || trimmed.contains("/\\@") {
-        return false;
-    }
-    true
 }

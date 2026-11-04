@@ -26,6 +26,30 @@ fn bad_value_warning(val: &str, attr: &str, el: &str, line: usize, col: usize) -
 }
 
 #[inline]
+fn check_url_attr(
+    val: &str,
+    attr: &str,
+    el: &str,
+    line: usize,
+    col: usize,
+    msgs: &mut Vec<VNuMessage>,
+) {
+    match validate_url_syntax(val) {
+        UrlValidationResult::ForbiddenCodePoint(cp) => {
+            msgs.push(VNuMessage::error(
+                format!("Forbidden code point U+{:04x}.", cp),
+                line,
+                col,
+            ));
+        }
+        UrlValidationResult::Invalid => {
+            msgs.push(bad_value_error(val, attr, el, line, col));
+        }
+        UrlValidationResult::Valid => {}
+    }
+}
+
+#[inline]
 fn is_forbidden_mime_byte(b: u8) -> bool {
     matches!(
         b,
@@ -105,7 +129,48 @@ impl Rule for DatatypesRule {
             }
         }
 
-        // 7. Element-specific datatype rules (non-input elements)
+        // 7. URL attributes on elements
+        if let Some(href) = tag.get_attr("href") {
+            if matches!(el.as_str(), "a" | "area" | "link" | "base") {
+                check_url_attr(href, "href", &el, tag.line, tag.col, &mut msgs);
+            }
+        }
+        if let Some(src) = tag.get_attr("src") {
+            if matches!(
+                el.as_str(),
+                "img" | "audio" | "video" | "source" | "track" | "iframe" | "embed" | "script"
+            ) {
+                check_url_attr(src, "src", &el, tag.line, tag.col, &mut msgs);
+            }
+        }
+        if let Some(cite) = tag.get_attr("cite") {
+            if matches!(el.as_str(), "del" | "ins" | "blockquote" | "q") {
+                check_url_attr(cite, "cite", &el, tag.line, tag.col, &mut msgs);
+            }
+        }
+        if el == "form" {
+            if let Some(act) = tag.get_attr("action") {
+                check_url_attr(act, "action", "form", tag.line, tag.col, &mut msgs);
+            }
+        }
+        if el == "object" {
+            if let Some(data) = tag.get_attr("data") {
+                check_url_attr(data, "data", "object", tag.line, tag.col, &mut msgs);
+            }
+        }
+        if el == "video" {
+            if let Some(poster) = tag.get_attr("poster") {
+                check_url_attr(poster, "poster", "video", tag.line, tag.col, &mut msgs);
+            }
+        }
+        if let Some(itemtype) = tag.get_attr("itemtype") {
+            check_url_attr(itemtype, "itemtype", &el, tag.line, tag.col, &mut msgs);
+        }
+        if let Some(itemid) = tag.get_attr("itemid") {
+            check_url_attr(itemid, "itemid", &el, tag.line, tag.col, &mut msgs);
+        }
+
+        // 8. Element-specific datatype rules (non-input elements)
         match el.as_str() {
             "textarea" => {
                 for attr in &["rows", "cols"] {
