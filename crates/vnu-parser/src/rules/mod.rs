@@ -48,7 +48,7 @@ pub fn default_rules() -> Vec<Box<dyn Rule>> {
         Box::new(InputRule::default()),
         Box::new(DatatypesRule),
         Box::new(ObsoleteRule),
-        Box::new(ScriptingRule),
+        Box::new(ScriptingRule::default()),
         Box::new(MediaRule::default()),
         Box::new(DlRule::default()),
         Box::new(BodyClosedRule::default()),
