@@ -40,4 +40,27 @@ mod tests {
         assert!(report.messages.iter().any(|m| m.message.contains("Duplicate ID “foo”")));
         assert!(report.messages.iter().any(|m| m.message.contains("Start tag “a” seen but an element of the same type was already open")));
     }
+
+    #[test]
+    fn test_forms_validation() {
+        let mut engine = ValidatorEngine::default();
+        let html = "<!DOCTYPE html><html lang=\"en\"><head><title>T</title></head><body><form><form></form></form><button type=\"invalid\">b</button><input type=\"bogus\"></body></html>";
+        let report = engine.validate(html);
+        assert!(!report.is_valid());
+        assert!(report.messages.iter().any(|m| m.message.contains("Nested forms are not allowed")));
+        assert!(report.messages.iter().any(|m| m.message.contains("Bad value “invalid” for attribute “type” on element “button”")));
+        assert!(report.messages.iter().any(|m| m.message.contains("Bad value “bogus” for attribute “type” on element “input”")));
+    }
+
+    #[test]
+    fn test_obsolete_and_tables() {
+        let mut engine = ValidatorEngine::default();
+        let html = "<!DOCTYPE html><html lang=\"en\"><head><title>T</title></head><body><center>old</center><font>f</font><div align=\"center\">d</div><table><td>stray</td></table></body></html>";
+        let report = engine.validate(html);
+        assert!(!report.is_valid());
+        assert!(report.messages.iter().any(|m| m.message.contains("The “center” element is obsolete")));
+        assert!(report.messages.iter().any(|m| m.message.contains("The “font” element is obsolete")));
+        assert!(report.messages.iter().any(|m| m.message.contains("The “align” attribute on the “div” element is obsolete")));
+        assert!(report.messages.iter().any(|m| m.message.contains("“td” start tag in table body")));
+    }
 }

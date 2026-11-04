@@ -151,4 +151,24 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn test_obsolete_and_forms_differential() {
+        let harness = OracleHarness::default();
+        let test_html = "<!DOCTYPE html><html lang='en'><head><title>T</title></head><body><form><form></form></form><center>old</center><font color='red'>text</font><div align='center'>d</div></body></html>";
+        match harness.compare(test_html) {
+            Ok(diff) => {
+                println!("Obsolete & forms diff -> Matched: {:?}", diff.matched_rules);
+                println!("Missing in local: {:?}", diff.missing_in_local);
+                assert!(!diff.oracle_valid);
+                assert!(!diff.local_valid);
+                assert!(diff.matched_rules.iter().any(|m| m.contains("Nested forms are not allowed")));
+                assert!(diff.matched_rules.iter().any(|m| m.contains("center")));
+                assert!(diff.matched_rules.iter().any(|m| m.contains("font")));
+            }
+            Err(e) => {
+                panic!("Oracle check failed: {:?}", e);
+            }
+        }
+    }
 }
