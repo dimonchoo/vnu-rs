@@ -259,20 +259,6 @@ impl Rule for DatatypesRule {
                 }
             }
             "meta" => {
-                if tag.has_attr_val("http-equiv", "refresh") {
-                    if let Some(content) = tag.get_attr("content") {
-                        let trimmed = content.trim();
-                        let valid = if trimmed.is_empty() {
-                            false
-                        } else {
-                            let num_str = trimmed.split(';').next().unwrap_or("").trim();
-                            num_str.parse::<u64>().is_ok()
-                        };
-                        if !valid {
-                            msgs.push(bad_value_error(content, "content", "meta", tag.line, tag.col));
-                        }
-                    }
-                }
                 if let Some(content) = tag.get_attr("content") {
                     let bytes = content.as_bytes();
                     let pos = bytes

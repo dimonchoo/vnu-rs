@@ -30,24 +30,6 @@ impl Rule for MetadataRule {
             } else {
                 self.base_seen = true;
             }
-        } else if name_lower == "meta" {
-            if let Some(charset) = tag.get_attr("charset") {
-                if !charset.eq_ignore_ascii_case("utf-8") {
-                    msgs.push(VNuMessage::error(
-                        format!(
-                            "Internal encoding declaration “{}” disagrees with the actual encoding of the document (“utf-8”).",
-                            charset
-                        ),
-                        tag.line,
-                        tag.col,
-                    ));
-                    msgs.push(VNuMessage::error(
-                        "The only allowed value for the “charset” attribute for the “meta” element is “utf-8”.",
-                        tag.line,
-                        tag.col,
-                    ));
-                }
-            }
         } else if name_lower == "script" && tag.has_attr("language") {
             msgs.push(VNuMessage::warning(
                 "The “language” attribute on the “script” element is obsolete. Use the “type” attribute instead.",

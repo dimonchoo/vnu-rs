@@ -113,4 +113,15 @@ mod tests {
         assert!(report.messages.iter().any(|m| m.message.contains("The value “json” is not a valid value for the “as” attribute of a “link” element with “rel=preload”")));
         assert!(report.messages.iter().any(|m| m.message.contains("must not appear as a descendant of a “body” element")));
     }
+
+    #[test]
+    fn test_meta_uniqueness_and_directives() {
+        let mut engine = ValidatorEngine::default();
+        let invalid = "<!DOCTYPE html><html lang=\"en\"><head><title>T</title><meta charset=\"utf-8\"><meta charset=\"utf-8\"><meta http-equiv=\"refresh\" content=\"invalid\"><meta name=\"viewport\" content=\"width=device-width, user-scalable=no\"></head><body></body></html>";
+        let report = engine.validate(invalid);
+        assert!(!report.is_valid());
+        assert!(report.messages.iter().any(|m| m.message.contains("A document must not include more than one “meta” element with a “charset” attribute.")));
+        assert!(report.messages.iter().any(|m| m.message.contains("Bad value “invalid” for attribute “content” on element “meta”.")));
+        assert!(report.messages.iter().any(|m| m.message.contains("Consider avoiding viewport values that prevent users from resizing documents.")));
+    }
 }

@@ -11,6 +11,7 @@ pub mod img_alt;
 pub mod link;
 pub mod lists;
 pub mod media;
+pub mod meta;
 pub mod metadata;
 pub mod nesting;
 pub mod obsolete;
@@ -30,6 +31,7 @@ pub use img_alt::ImgAltRule;
 pub use link::LinkRule;
 pub use lists::DlRule;
 pub use media::MediaRule;
+pub use meta::MetaRule;
 pub use metadata::MetadataRule;
 pub use nesting::NestingRule;
 pub use obsolete::ObsoleteRule;
@@ -58,6 +60,7 @@ pub fn default_rules() -> Vec<Box<dyn Rule>> {
         Box::new(AriaRule::default()),
         Box::new(ContentModelRule),
         Box::new(MetadataRule::default()),
+        Box::new(MetaRule::default()),
         Box::new(LinkRule),
     ]
 }
