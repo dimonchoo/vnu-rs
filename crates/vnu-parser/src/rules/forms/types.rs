@@ -10,7 +10,7 @@ pub const VALID_INPUT_TYPES: &[&str] = &[
 
 #[inline]
 pub fn effective_input_type(tag: &ElementContext) -> &'static str {
-    let raw = tag.get_attr("type").unwrap_or("text");
+    let raw = tag.get_attr("type").unwrap_or("text").trim();
     VALID_INPUT_TYPES
         .iter()
         .find(|&&vt| vt.eq_ignore_ascii_case(raw))

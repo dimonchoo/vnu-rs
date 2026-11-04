@@ -7,6 +7,8 @@ use crate::rule::Rule;
 use temporal::*;
 use tokens::*;
 
+
+
 #[inline]
 fn bad_value_error(val: &str, attr: &str, el: &str, line: usize, col: usize) -> VNuMessage {
     VNuMessage::error(
@@ -225,6 +227,7 @@ impl Rule for DatatypesRule {
                     }
                 }
             }
+
             "script" => {
                 if let Some(integrity) = tag.get_attr("integrity") {
                     let valid = integrity.split_whitespace().all(|token| {

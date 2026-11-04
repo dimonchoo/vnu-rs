@@ -4,14 +4,14 @@ use crate::rule::Rule;
 
 fn allowed_parents(tag_name: &str) -> Option<&'static [&'static str]> {
     match tag_name {
-        "li" => Some(&["ul", "ol", "menu"]),
-        "dt" | "dd" => Some(&["dl", "div"]),
-        "source" => Some(&["audio", "video", "picture"]),
-        "track" => Some(&["audio", "video"]),
-        "area" => Some(&["map"]),
-        "param" => Some(&["object"]),
-        "optgroup" => Some(&["select"]),
-        "option" => Some(&["select", "optgroup", "datalist"]),
+        "li" => Some(&["ul", "ol", "menu", "template"]),
+        "dt" | "dd" => Some(&["dl", "div", "template"]),
+        "source" => Some(&["audio", "video", "picture", "template"]),
+        "track" => Some(&["audio", "video", "template"]),
+        "area" => Some(&["map", "template"]),
+        "param" => Some(&["object", "template"]),
+        "optgroup" => Some(&["select", "template"]),
+        "option" => Some(&["select", "optgroup", "datalist", "template"]),
         _ => None,
     }
 }

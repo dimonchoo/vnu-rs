@@ -59,6 +59,114 @@ pub fn is_valid_positive_float(val: &str) -> bool {
     }
 }
 
+// Any valid HTML5 floating point number
+pub fn is_valid_float(val: &str) -> bool {
+    if val.is_empty() || val.starts_with('+') {
+        return false;
+    }
+    match val.parse::<f64>() {
+        Ok(n) => n.is_finite(),
+        _ => false,
+    }
+}
+
+const AUTOCOMPLETE_FIELDS: &[&str] = &[
+    "additional-name",
+    "address-level1",
+    "address-level2",
+    "address-level3",
+    "address-level4",
+    "address-line1",
+    "address-line2",
+    "address-line3",
+    "bday",
+    "bday-day",
+    "bday-month",
+    "bday-year",
+    "cc-additional-name",
+    "cc-csc",
+    "cc-exp",
+    "cc-exp-month",
+    "cc-exp-year",
+    "cc-family-name",
+    "cc-given-name",
+    "cc-name",
+    "cc-number",
+    "cc-type",
+    "country",
+    "country-name",
+    "current-password",
+    "email",
+    "family-name",
+    "given-name",
+    "honorific-prefix",
+    "honorific-suffix",
+    "impp",
+    "language",
+    "name",
+    "new-password",
+    "nickname",
+    "one-time-code",
+    "organization",
+    "organization-title",
+    "photo",
+    "postal-code",
+    "sex",
+    "street-address",
+    "tel",
+    "tel-area-code",
+    "tel-country-code",
+    "tel-extension",
+    "tel-local",
+    "tel-local-prefix",
+    "tel-local-suffix",
+    "tel-national",
+    "transaction-amount",
+    "transaction-currency",
+    "url",
+    "username",
+];
+
+pub fn is_valid_autocomplete(val: &str) -> bool {
+    let trimmed = val.trim();
+    if trimmed.is_empty() {
+        return false;
+    }
+    if trimmed.eq_ignore_ascii_case("on") || trimmed.eq_ignore_ascii_case("off") {
+        return true;
+    }
+    let tokens: Vec<&str> = trimmed.split_whitespace().collect();
+    if tokens.is_empty() {
+        return false;
+    }
+
+    let mut i = 0;
+    // Optional section-*
+    if i < tokens.len() && tokens[i].starts_with("section-") && tokens[i].len() > 8 {
+        i += 1;
+    }
+
+    // Optional shipping or billing
+    if i < tokens.len() && (tokens[i] == "shipping" || tokens[i] == "billing") {
+        i += 1;
+    }
+
+    // Next must be an autofill field name
+    if i >= tokens.len() || AUTOCOMPLETE_FIELDS.binary_search(&tokens[i]).is_err() {
+        return false;
+    }
+    i += 1;
+
+    // Optional webauthn at the end
+    if i < tokens.len() && tokens[i] == "webauthn" {
+        i += 1;
+    }
+
+    i == tokens.len()
+}
+
+
+
 // Custom element name
 pub fn is_valid_custom_element_name(val: &str) -> bool {
     if val.is_empty() {

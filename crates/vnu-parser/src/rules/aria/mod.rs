@@ -41,7 +41,7 @@ impl Rule for AriaRule {
     fn on_finish(&mut self, ctx: &ValidationContext) -> Vec<VNuMessage> {
         let mut msgs = Vec::new();
         for (id_ref, line, col) in &self.pending_activedescendants {
-            if !ctx.seen_ids.contains(id_ref) {
+            if !ctx.id_to_tag.contains_key(id_ref) {
                 msgs.push(VNuMessage::error(
                     format!(
                         "The “aria-activedescendant” attribute references “{}”, which is not the ID of any element in this document.",

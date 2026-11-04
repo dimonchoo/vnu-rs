@@ -24,6 +24,16 @@ impl LineIndex {
         }
     }
 
+    pub fn line_offset(&self, line: usize) -> usize {
+        if line == 0 {
+            0
+        } else if line <= self.offsets.len() {
+            self.offsets[line - 1]
+        } else {
+            self.len
+        }
+    }
+
     pub fn location(&self, byte_offset: usize) -> SourceLocation {
         let offset = byte_offset.min(self.len);
         let line_idx = match self.offsets.binary_search(&offset) {
@@ -94,7 +104,7 @@ pub struct ValidationContext<'a> {
     pub head_seen: bool,
     pub title_seen: bool,
     pub body_seen: bool,
-    pub seen_ids: std::collections::HashSet<String>,
+    pub id_to_tag: std::collections::HashMap<String, String>,
 }
 
 impl<'a> ValidationContext<'a> {
@@ -108,7 +118,7 @@ impl<'a> ValidationContext<'a> {
             head_seen: false,
             title_seen: false,
             body_seen: false,
-            seen_ids: std::collections::HashSet::new(),
+            id_to_tag: std::collections::HashMap::new(),
         }
     }
 

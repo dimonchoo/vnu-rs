@@ -8,6 +8,11 @@ license.workspace = true
 name = "vnu"
 path = "src/main.rs"
 
+[[bin]]
+name = "eval_parity"
+path = "src/bin/eval_parity.rs"
+
+
 [dependencies]
 vnu-core = { path = "../vnu-core" }
 vnu-parser = { path = "../vnu-parser" }

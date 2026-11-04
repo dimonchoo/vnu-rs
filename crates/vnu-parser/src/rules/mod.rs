@@ -1,4 +1,5 @@
 pub mod aria;
+pub mod body_closed;
 pub mod content_model;
 pub mod datatypes;
 pub mod doctype;
@@ -7,6 +8,7 @@ pub mod forms;
 pub mod head_title;
 pub mod html_lang;
 pub mod img_alt;
+pub mod lists;
 pub mod media;
 pub mod metadata;
 pub mod nesting;
@@ -15,6 +17,7 @@ pub mod scripting;
 pub mod tables;
 
 pub use aria::AriaRule;
+pub use body_closed::BodyClosedRule;
 pub use content_model::ContentModelRule;
 pub use datatypes::DatatypesRule;
 pub use doctype::DoctypeRule;
@@ -23,6 +26,7 @@ pub use forms::{FormsRule, InputRule};
 pub use head_title::HeadTitleRule;
 pub use html_lang::HtmlLangRule;
 pub use img_alt::ImgAltRule;
+pub use lists::DlRule;
 pub use media::MediaRule;
 pub use metadata::MetadataRule;
 pub use nesting::NestingRule;
@@ -40,12 +44,14 @@ pub fn default_rules() -> Vec<Box<dyn Rule>> {
         Box::new(ImgAltRule),
         Box::new(NestingRule),
         Box::new(DuplicateIdRule::default()),
-        Box::new(FormsRule),
-        Box::new(InputRule),
+        Box::new(FormsRule::default()),
+        Box::new(InputRule::default()),
         Box::new(DatatypesRule),
         Box::new(ObsoleteRule),
         Box::new(ScriptingRule),
         Box::new(MediaRule::default()),
+        Box::new(DlRule::default()),
+        Box::new(BodyClosedRule::default()),
         Box::new(TablesRule),
         Box::new(AriaRule::default()),
         Box::new(ContentModelRule),

@@ -9,11 +9,17 @@ use crate::context::{ElementContext, ValidationContext};
 use crate::rule::Rule;
 
 #[derive(Default)]
-pub struct FormsRule;
+pub struct FormsRule {
+    pending_commandfor: Vec<(String, usize, usize)>,
+}
 
 impl Rule for FormsRule {
     fn name(&self) -> &'static str {
         "forms"
+    }
+
+    fn reset(&mut self) {
+        self.pending_commandfor.clear();
     }
 
     fn on_start_tag(&mut self, ctx: &ValidationContext, tag: &ElementContext) -> Vec<VNuMessage> {
@@ -39,8 +45,26 @@ impl Rule for FormsRule {
                     ));
                 }
             }
+            if let Some(cf) = tag.get_attr("commandfor") {
+                self.pending_commandfor.push((cf.to_string(), tag.line, tag.col));
+            }
         }
 
         msgs
     }
+
+    fn on_finish(&mut self, ctx: &ValidationContext) -> Vec<VNuMessage> {
+        let mut msgs = Vec::new();
+        for (cf, line, col) in &self.pending_commandfor {
+            if !ctx.id_to_tag.contains_key(cf) {
+                msgs.push(VNuMessage::error(
+                    "The value of the “commandfor” attribute of the “button” element must be the ID of an element in the same tree as the “button” with the “commandfor” attribute.".to_string(),
+                    *line,
+                    *col,
+                ));
+            }
+        }
+        msgs
+    }
 }
+

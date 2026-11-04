@@ -1,24 +1,23 @@
 use std::cell::RefCell;
 use html5ever::tokenizer::states::RawKind;
 use html5ever::tokenizer::{
-    BufferQueue, TagKind, Token, TokenSink, TokenSinkResult, Tokenizer, TokenizerOpts,
-    TokenizerResult,
+    TagKind, Token, TokenSink, TokenSinkResult,
 };
-use vnu_core::{MessageSubType, MessageType, VNuMessage, VNuReport};
+use vnu_core::{MessageSubType, MessageType, VNuMessage};
 use crate::context::{DocumentMode, ElementContext, LineIndex, ValidationContext};
+use crate::engine::scan_policy::ScanPolicy;
 use crate::rule::Rule;
-use crate::rules::default_rules;
 
 const VOID_ELEMENTS: &[&str] = &[
     "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source",
     "track", "wbr",
 ];
 
-fn is_void_element(name: &str) -> bool {
+pub fn is_void_element(name: &str) -> bool {
     VOID_ELEMENTS.iter().any(|&v| v.eq_ignore_ascii_case(name))
 }
 
-fn apply_implicit_closures(open_elements: &mut Vec<ElementContext>, tag_name: &str, is_start_tag: bool) {
+pub fn apply_implicit_closures(open_elements: &mut Vec<ElementContext>, tag_name: &str, is_start_tag: bool) {
     if is_start_tag {
         if tag_name.eq_ignore_ascii_case("li") {
             if let Some(top) = open_elements.last() {
@@ -56,7 +55,7 @@ fn apply_implicit_closures(open_elements: &mut Vec<ElementContext>, tag_name: &s
                 }
             }
         } else if tag_name.eq_ignore_ascii_case("p")
-            || ["div", "ul", "ol", "table", "h1", "h2", "h3", "h4", "h5", "h6",
+            || ["dl", "div", "ul", "ol", "table", "h1", "h2", "h3", "h4", "h5", "h6",
                 "pre", "blockquote", "form", "hr", "header", "footer", "nav", "section", "article"]
                 .iter()
                 .any(|&e| e.eq_ignore_ascii_case(tag_name))
@@ -73,7 +72,7 @@ fn apply_implicit_closures(open_elements: &mut Vec<ElementContext>, tag_name: &s
                 open_elements.pop();
             }
         }
-    } else if tag_name.eq_ignore_ascii_case("dl") {
+    } else if tag_name.eq_ignore_ascii_case("dl") || tag_name.eq_ignore_ascii_case("div") {
         if let Some(top) = open_elements.last() {
             if top.name.eq_ignore_ascii_case("dt") || top.name.eq_ignore_ascii_case("dd") {
                 open_elements.pop();
@@ -108,27 +107,50 @@ fn apply_implicit_closures(open_elements: &mut Vec<ElementContext>, tag_name: &s
     }
 }
 
-struct StreamingValidator<'a> {
-    ctx: ValidationContext<'a>,
-    rules: Vec<Box<dyn Rule>>,
-    messages: Vec<VNuMessage>,
-    first_tag_seen: bool,
+pub struct StreamingValidator<'a> {
+    pub ctx: ValidationContext<'a>,
+    pub rules: Vec<Box<dyn Rule>>,
+    pub char_rule_indices: Vec<usize>,
+    pub stray_rule_indices: Vec<usize>,
+    pub messages: Vec<VNuMessage>,
+    pub scan_policy: ScanPolicy,
+    pub in_script_or_style: bool,
+    pub first_tag_seen: bool,
+    pub line_index: &'a LineIndex,
 }
 
 impl<'a> StreamingValidator<'a> {
-    fn new(source: &'a str, rules: Vec<Box<dyn Rule>>) -> Self {
+    pub fn new(source: &'a str, rules: Vec<Box<dyn Rule>>, line_index: &'a LineIndex) -> Self {
+        let char_rule_indices = rules
+            .iter()
+            .enumerate()
+            .filter(|(_, r)| r.handles_character_tokens())
+            .map(|(i, _)| i)
+            .collect();
+        let stray_rule_indices = rules
+            .iter()
+            .enumerate()
+            .filter(|(_, r)| r.handles_stray_end_tags())
+            .map(|(i, _)| i)
+            .collect();
         Self {
             ctx: ValidationContext::new(source),
             rules,
+            char_rule_indices,
+            stray_rule_indices,
             messages: Vec::new(),
+            scan_policy: ScanPolicy::default(),
+            in_script_or_style: false,
             first_tag_seen: false,
+            line_index,
         }
     }
 
-    fn handle_token(&mut self, token: Token, line_u64: u64) {
+    pub fn handle_token(&mut self, token: Token, line_u64: u64) {
         let line = line_u64 as usize;
         match token {
             Token::DoctypeToken(d) => {
+                self.scan_policy.tracker.on_doctype(&d, self.ctx.doctype_seen);
                 self.ctx.doctype_seen = true;
                 let name = d.name.as_deref().unwrap_or("");
                 for rule in &mut self.rules {
@@ -146,12 +168,18 @@ impl<'a> StreamingValidator<'a> {
                             .map(|a| (a.name.local.to_string(), a.value.to_string()))
                             .collect();
 
+                        let byte_offset = self.line_index.line_offset(line);
+                        self.scan_policy.tracker.on_start_tag(&name_str, &attrs, byte_offset);
+                        if name_str.eq_ignore_ascii_case("script") || name_str.eq_ignore_ascii_case("style") {
+                            self.in_script_or_style = true;
+                        }
+
                         let elem = ElementContext {
                             name: name_str.clone(),
                             attrs,
                             line,
                             col,
-                            byte_offset: 0,
+                            byte_offset,
                         };
 
                         if !self.first_tag_seen {
@@ -199,7 +227,7 @@ impl<'a> StreamingValidator<'a> {
                         }
 
                         if let Some(id) = elem.get_attr("id") {
-                            self.ctx.seen_ids.insert(id.to_string());
+                            self.ctx.id_to_tag.insert(id.to_string(), elem.name.to_ascii_lowercase());
                         }
 
                         // Implicit end tags for optional HTML5 elements
@@ -221,12 +249,27 @@ impl<'a> StreamingValidator<'a> {
                         }
                     }
                     TagKind::EndTag => {
+                        if name_str.eq_ignore_ascii_case("script") || name_str.eq_ignore_ascii_case("style") {
+                            self.in_script_or_style = false;
+                        }
+                        self.scan_policy.tracker.on_end_tag(&name_str, is_void_element(&name_str));
                         if is_void_element(&name_str) {
-                            self.messages.push(VNuMessage::error(
-                                format!("Stray end tag “{}”.", name_str),
-                                line,
-                                col,
-                            ));
+                            let mut handled = false;
+                            for &idx in &self.stray_rule_indices {
+                                let stray = self.rules[idx].on_stray_end_tag(&self.ctx, &name_str, line, col);
+                                if !stray.is_empty() {
+                                    self.messages.extend(stray);
+                                    handled = true;
+                                    break;
+                                }
+                            }
+                            if !handled {
+                                self.messages.push(VNuMessage::error(
+                                    format!("Stray end tag “{}”.", name_str),
+                                    line,
+                                    col,
+                                ));
+                            }
                             return;
                         }
 
@@ -250,24 +293,52 @@ impl<'a> StreamingValidator<'a> {
                                 self.messages.extend(rule.on_end_tag(&self.ctx, &name_str, line, col));
                             }
                             self.ctx.open_elements.truncate(pos);
-                        } else {
+                        } else if name_str.eq_ignore_ascii_case("p") {
                             self.messages.push(VNuMessage::error(
-                                format!("Stray end tag “{}”.", name_str),
+                                "No “p” element in scope but a “p” end tag seen.".to_string(),
                                 line,
                                 col,
                             ));
+                        } else {
+                            let mut handled = false;
+                            for &idx in &self.stray_rule_indices {
+                                let stray = self.rules[idx].on_stray_end_tag(&self.ctx, &name_str, line, col);
+                                if !stray.is_empty() {
+                                    self.messages.extend(stray);
+                                    handled = true;
+                                    break;
+                                }
+                            }
+                            if !handled {
+                                self.messages.push(VNuMessage::error(
+                                    format!("Stray end tag “{}”.", name_str),
+                                    line,
+                                    col,
+                                ));
+                            }
                         }
                     }
                 }
             }
+            Token::CharacterTokens(text) => {
+                let s: &str = &text;
+                self.scan_policy.tracker.on_characters(s, self.in_script_or_style);
+
+                for &idx in &self.char_rule_indices {
+                    if self.rules[idx].interested_in_characters(&self.ctx) {
+                        self.messages.extend(self.rules[idx].on_characters(&self.ctx, s, line, 1));
+                    }
+                }
+            }
             Token::ParseError(err) => {
+                self.scan_policy.tracker.on_parse_error();
                 self.messages.push(VNuMessage::error(err.to_string(), line, 1));
             }
             _ => {}
         }
     }
 
-    fn finish(mut self) -> (ValidationContext<'a>, Vec<Box<dyn Rule>>, Vec<VNuMessage>) {
+    pub fn finish(mut self) -> (ValidationContext<'a>, Vec<Box<dyn Rule>>, Vec<VNuMessage>, ScanPolicy) {
         for rule in &mut self.rules {
             self.messages.extend(rule.on_finish(&self.ctx));
         }
@@ -277,6 +348,7 @@ impl<'a> StreamingValidator<'a> {
                 .iter()
                 .any(|&t| t.eq_ignore_ascii_case(&e.name))
         }) {
+            self.scan_policy.tracker.needs_scan = true;
             self.messages.push(VNuMessage::error(
                 "End of file seen and there were open elements.".to_string(),
                 unclosed.line,
@@ -284,12 +356,12 @@ impl<'a> StreamingValidator<'a> {
             ));
         }
 
-        (self.ctx, self.rules, self.messages)
+        (self.ctx, self.rules, self.messages, self.scan_policy)
     }
 }
 
-struct StreamingSink<'a> {
-    inner: RefCell<StreamingValidator<'a>>,
+pub struct StreamingSink<'a> {
+    pub inner: RefCell<StreamingValidator<'a>>,
 }
 
 impl<'a> TokenSink for StreamingSink<'a> {
@@ -319,77 +391,5 @@ impl<'a> TokenSink for StreamingSink<'a> {
         };
         self.inner.borrow_mut().handle_token(token, line_number);
         raw_kind.unwrap_or(TokenSinkResult::Continue)
-    }
-}
-
-pub struct ValidatorEngine {
-    rules: Vec<Box<dyn Rule>>,
-}
-
-impl Default for ValidatorEngine {
-    fn default() -> Self {
-        Self {
-            rules: default_rules(),
-        }
-    }
-}
-
-impl ValidatorEngine {
-    pub fn new(rules: Vec<Box<dyn Rule>>) -> Self {
-        Self { rules }
-    }
-
-    pub fn validate(&mut self, html: &str) -> VNuReport {
-        let mut report = VNuReport::new();
-        let line_index = LineIndex::new(html);
-
-        for r in &mut self.rules {
-            r.reset();
-        }
-
-        // Take rules temporarily for streaming validation
-        let active_rules = std::mem::take(&mut self.rules);
-        let sink = StreamingSink {
-            inner: RefCell::new(StreamingValidator::new(html, active_rules)),
-        };
-
-        let tok = Tokenizer::new(sink, TokenizerOpts::default());
-        let input = BufferQueue::default();
-        input.push_back(html.into());
-
-        match tok.feed(&input) {
-            TokenizerResult::Done | TokenizerResult::Script(_) => {}
-        }
-        tok.end();
-
-        // Reclaim rules and messages
-        let inner = tok.sink.inner.into_inner();
-        let (_ctx, mut rules, messages) = inner.finish();
-        for r in &mut rules {
-            r.reset();
-        }
-        self.rules = rules;
-        report.messages = messages;
-
-        // Populate line extracts where possible (truncated to 120 chars for performance)
-        for msg in &mut report.messages {
-            if let Some(l) = msg.last_line {
-                let snippet = line_index.line_snippet(html, l);
-                if !snippet.is_empty() {
-                    let truncated = if snippet.len() > 120 {
-                        let mut end = 120;
-                        while end > 0 && !snippet.is_char_boundary(end) {
-                            end -= 1;
-                        }
-                        &snippet[..end]
-                    } else {
-                        snippet
-                    };
-                    msg.extract = Some(truncated.to_string());
-                }
-            }
-        }
-
-        report
     }
 }

@@ -2,6 +2,7 @@ pub mod context;
 pub mod engine;
 pub mod rule;
 pub mod rules;
+pub mod syntax;
 
 pub use context::{ElementContext, LineIndex, SourceLocation, ValidationContext};
 pub use engine::ValidatorEngine;
