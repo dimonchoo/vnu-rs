@@ -1,7 +1,7 @@
 # vnu-rs
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/dimonchoo/vnu-rs/master/docs/assets/logo.png" alt="vnu-rs logo" width="160" onerror="this.style.display='none'"/>
+  <img src="docs/assets/logo.svg" alt="vnu-rs logo" width="160"/>
 </p>
 
 <p align="center">
@@ -240,6 +240,31 @@ vnu-rs/
 
 ---
 
+## Testing & Reproducing W3C Parity
+
+### 1. Internal Workspace Tests (Self-Contained)
+Run the internal unit and differential integration tests bundled directly in the repository:
+```bash
+cargo test
+# or:
+make test
+```
+*Runs immediately out of the box with zero external setup.*
+
+### 2. Full Upstream W3C Parity Suite (5,824 Tests)
+To evaluate and independently verify the **100.00% conformance score** against the official upstream [W3C validator test fixtures](https://github.com/validator/validator/tree/master/tests):
+
+```bash
+# 1. Fetch the official W3C test suite (shallow clone into ../validator-upstream)
+make fetch-upstream
+
+# 2. Run the multi-threaded parity harness
+make parity
+```
+This evaluates all 5,824 official W3C fixtures in parallel and outputs the full subcategory breakdown in ~250–350 ms.
+
+---
+
 ## Development & Makefile Cheatsheet
 
 | Command | Description |
@@ -247,6 +272,7 @@ vnu-rs/
 | `make build` | Compile the optimized release binary (`./target/release/vnu`) |
 | `make check` | Run fast cargo workspace type checks |
 | `make test` | Execute all internal unit and integration tests |
+| `make fetch-upstream` | Clone upstream W3C test fixtures (`../validator-upstream`) |
 | `make parity` | Run the full 5,824 upstream W3C test suite |
 | `make fmt` | Format the entire codebase using `rustfmt` |
 | `make docker-build` | Build the minimal Alpine Docker image (`vnu-rs:latest`) |

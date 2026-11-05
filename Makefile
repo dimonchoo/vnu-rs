@@ -1,4 +1,4 @@
-.PHONY: all build check test parity fmt docker-build docker-run docker-stop audit-site oracle help
+.PHONY: all build check test parity fmt docker-build docker-run docker-stop audit-site oracle help fetch-upstream
 
 CARGO ?= cargo
 UPSTREAM_TESTS ?= $(firstword $(wildcard $(VNU_UPSTREAM_TESTS) ../validator-upstream/tests ../../validator-upstream/tests ./validator-upstream/tests))
@@ -9,16 +9,17 @@ all: check test
 
 help:
 	@echo "vnu-rs Development & Testing Commands:"
-	@echo "  make build         - Build vnu-rs release binary"
-	@echo "  make test          - Run internal unit & integration tests"
-	@echo "  make parity        - Run 100% upstream W3C test suite (5,824 tests)"
-	@echo "  make check         - Type check all crates"
-	@echo "  make fmt           - Format codebase with rustfmt"
-	@echo "  make docker-build  - Build minimal Debian release Docker image"
-	@echo "  make docker-run    - Run vnu-rs daemon in Docker (:$(DOCKER_PORT)->8888)"
-	@echo "  make docker-stop   - Stop and remove vnu-rs Docker container"
-	@echo "  make oracle        - Run differential oracle against Java vnu (:8888)"
-	@echo "  make audit-site    - Crawl and compare production pages against Java & Rust"
+	@echo "  make build          - Build vnu-rs release binary"
+	@echo "  make test           - Run internal unit & integration tests"
+	@echo "  make parity         - Run 100% upstream W3C test suite (5,824 tests)"
+	@echo "  make fetch-upstream - Fetch official W3C test fixtures from upstream"
+	@echo "  make check          - Type check all crates"
+	@echo "  make fmt            - Format codebase with rustfmt"
+	@echo "  make docker-build   - Build minimal Debian release Docker image"
+	@echo "  make docker-run     - Run vnu-rs daemon in Docker (:$(DOCKER_PORT)->8888)"
+	@echo "  make docker-stop    - Stop and remove vnu-rs Docker container"
+	@echo "  make oracle         - Run differential oracle against Java vnu (:8888)"
+	@echo "  make audit-site     - Crawl and compare production pages against Java & Rust"
 
 build:
 	$(CARGO) build --release
@@ -29,9 +30,20 @@ check:
 test:
 	$(CARGO) test --workspace
 
+fetch-upstream:
+	@if [ -d "../validator-upstream" ]; then \
+		echo "Upstream directory ../validator-upstream already exists."; \
+	else \
+		echo "Fetching official W3C upstream test suite..."; \
+		git clone --depth 1 https://github.com/validator/validator.git ../validator-upstream; \
+		echo "Upstream tests ready at ../validator-upstream/tests"; \
+	fi
+
 parity:
 	@if [ -z "$(UPSTREAM_TESTS)" ] || [ ! -d "$(UPSTREAM_TESTS)" ]; then \
-		echo "Error: Upstream tests directory not found. Please set VNU_UPSTREAM_TESTS=/path/to/validator-upstream/tests"; \
+		echo "Upstream W3C tests directory not found."; \
+		echo "Run 'make fetch-upstream' to clone the official test suite from https://github.com/validator/validator,"; \
+		echo "or set VNU_UPSTREAM_TESTS=/path/to/validator/tests"; \
 		exit 1; \
 	fi
 	VNU_UPSTREAM_TESTS=$(UPSTREAM_TESTS) $(CARGO) run --release --bin eval_parity
