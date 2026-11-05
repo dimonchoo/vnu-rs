@@ -98,27 +98,29 @@ pub fn validate_input_values(
 
     if effective_type == "url" {
         if let Some(val) = tag.get_attr("value") {
-            let has_scheme = val
-                .split_once(':')
-                .map(|(scheme, _)| {
-                    !scheme.is_empty()
-                        && scheme.chars().next().unwrap().is_ascii_alphabetic()
-                        && scheme
-                            .chars()
-                            .all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '-' || c == '.')
-                })
-                .unwrap_or(false);
-            if !has_scheme || val.starts_with('#') || val.starts_with('/') {
-                msgs.push(VNuMessage::error(
-                    format!(
-                        "Bad value “{}” for attribute “value” on element “input”.",
-                        val
-                    ),
-                    tag.line,
-                    tag.col,
-                ));
-            } else {
-                check_url_attr(val, "value", tag.line, tag.col, msgs);
+            if !val.is_empty() {
+                let has_scheme = val
+                    .split_once(':')
+                    .map(|(scheme, _)| {
+                        !scheme.is_empty()
+                            && scheme.chars().next().unwrap().is_ascii_alphabetic()
+                            && scheme.chars().all(|c| {
+                                c.is_ascii_alphanumeric() || c == '+' || c == '-' || c == '.'
+                            })
+                    })
+                    .unwrap_or(false);
+                if !has_scheme || val.starts_with('#') || val.starts_with('/') {
+                    msgs.push(VNuMessage::error(
+                        format!(
+                            "Bad value “{}” for attribute “value” on element “input”.",
+                            val
+                        ),
+                        tag.line,
+                        tag.col,
+                    ));
+                } else {
+                    check_url_attr(val, "value", tag.line, tag.col, msgs);
+                }
             }
         }
     }

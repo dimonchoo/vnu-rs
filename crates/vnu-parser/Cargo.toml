@@ -12,3 +12,6 @@ serde_json.workspace = true
 thiserror.workspace = true
 html5ever.workspace = true
 tendril.workspace = true
+unicode-normalization = "0.1"
+
+

@@ -20,6 +20,10 @@ pub trait Rule: Send + Sync {
         vec![]
     }
 
+    fn interested_in_start_tag(&self, _tag: &ElementContext) -> bool {
+        true
+    }
+
     fn on_end_tag(
         &mut self,
         _ctx: &ValidationContext,

@@ -14,6 +14,9 @@ impl Rule for CustomElementsRule {
 
     fn on_start_tag(&mut self, ctx: &ValidationContext, tag: &ElementContext) -> Vec<VNuMessage> {
         let mut msgs = Vec::new();
+        if ctx.is_descendant_of("svg") || ctx.is_descendant_of("math") {
+            return msgs;
+        }
 
         if tag.name.contains('-') {
             let name_lower = tag.name.to_ascii_lowercase();

@@ -35,6 +35,7 @@ pub struct SelectRule {
     standalone_option_has_label: bool,
     standalone_option_line: usize,
     standalone_option_col: usize,
+    in_option_depth: usize,
 }
 
 impl Rule for SelectRule {
@@ -48,16 +49,15 @@ impl Rule for SelectRule {
         self.standalone_option_has_label = false;
         self.standalone_option_line = 0;
         self.standalone_option_col = 0;
+        self.in_option_depth = 0;
     }
 
     fn handles_character_tokens(&self) -> bool {
         true
     }
 
-    fn interested_in_characters(&self, ctx: &ValidationContext) -> bool {
-        ctx.open_elements
-            .last()
-            .is_some_and(|e| e.name.eq_ignore_ascii_case("option"))
+    fn interested_in_characters(&self, _ctx: &ValidationContext) -> bool {
+        self.in_option_depth > 0
     }
 
     fn on_characters(
@@ -90,6 +90,7 @@ impl Rule for SelectRule {
         }
 
         if name_lower == "option" {
+            self.in_option_depth += 1;
             check_option_start(tag, &mut msgs);
 
             let has_label = tag.get_attr("label").is_some_and(|l| !l.is_empty());
@@ -195,6 +196,7 @@ impl Rule for SelectRule {
         let name_lower = name.to_ascii_lowercase();
 
         if name_lower == "option" {
+            self.in_option_depth = self.in_option_depth.saturating_sub(1);
             if let Some(state) = self.select_stack.last_mut() {
                 if !state.current_option_has_label && state.current_option_text.trim().is_empty() {
                     msgs.push(VNuMessage::error(

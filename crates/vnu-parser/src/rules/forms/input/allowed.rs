@@ -67,6 +67,7 @@ const REQUIRED_TYPES: &[&str] = &[
     "url",
     "week",
 ];
+#[allow(dead_code)]
 const SIZE_TYPES: &[&str] = &["email", "password", "search", "tel", "text", "url"];
 
 pub fn get_input_attribute_allowed(attr: &str) -> Option<&'static [&'static str]> {
@@ -79,7 +80,9 @@ pub fn get_input_attribute_allowed(attr: &str) -> Option<&'static [&'static str]
         "placeholder" => Some(PLACEHOLDER_TYPES),
         "readonly" => Some(READONLY_TYPES),
         "required" => Some(REQUIRED_TYPES),
-        "size" => Some(SIZE_TYPES),
+        // Note: in upstream Assertions.java, "size" is present in INPUT_ATTRIBUTES,
+        // but line 2856 has `else if (OBSOLETE_STYLE_ATTRS.containsKey(attLocal))` which matches "size"
+        // (for hr) and shadows the input size check, so upstream Java never enforces input type for size.
         _ => None,
     }
 }
@@ -151,6 +154,15 @@ pub fn is_global_or_common_attr(attr: &str) -> bool {
             | "itemref"
             | "itemscope"
             | "itemtype"
+            | "about"
+            | "content"
+            | "datatype"
+            | "inlist"
+            | "prefix"
+            | "property"
+            | "resource"
+            | "typeof"
+            | "vocab"
     )
 }
 

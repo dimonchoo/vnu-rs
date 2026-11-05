@@ -77,7 +77,7 @@ impl Rule for MetaRule {
             }
         }
 
-        if tag.has_attr_val("name", "description") {
+        if tag.get_attr("name") == Some("description") {
             if self.has_meta_description {
                 msgs.push(VNuMessage::error(
                     "A document must not include more than one “meta” element with its “name” attribute set to the value “description”.",

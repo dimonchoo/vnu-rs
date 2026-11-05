@@ -151,6 +151,11 @@ pub fn is_valid_autocomplete(val: &str) -> bool {
         i += 1;
     }
 
+    // Optional contact type token before contact fields
+    if i < tokens.len() && matches!(tokens[i], "home" | "work" | "mobile" | "fax" | "pager") {
+        i += 1;
+    }
+
     // Next must be an autofill field name
     if i >= tokens.len() || AUTOCOMPLETE_FIELDS.binary_search(&tokens[i]).is_err() {
         return false;
@@ -216,7 +221,11 @@ pub fn is_valid_bcp47_lang_tag(val: &str) -> bool {
         }
     }
     let primary = subtags[0].to_ascii_lowercase();
-    if primary == "zzz" || primary == "mo" || trimmed.eq_ignore_ascii_case("bat-smg") {
+    if primary == "zzz"
+        || primary == "mo"
+        || primary == "chu"
+        || trimmed.eq_ignore_ascii_case("bat-smg")
+    {
         return false;
     }
     true
@@ -285,9 +294,11 @@ pub fn validate_url_syntax(val: &str) -> UrlValidationResult {
                     return UrlValidationResult::Invalid;
                 }
                 if let Some((_h, port_str)) = host_part.rsplit_once(':') {
-                    match port_str.parse::<u32>() {
-                        Ok(p) if p <= 65535 => {}
-                        _ => return UrlValidationResult::Invalid,
+                    if !port_str.is_empty() && !port_str.contains(']') {
+                        match port_str.parse::<u32>() {
+                            Ok(p) if p <= 65535 => {}
+                            _ => return UrlValidationResult::Invalid,
+                        }
                     }
                 }
                 if host_part.is_empty()
@@ -340,12 +351,12 @@ pub fn validate_url_syntax(val: &str) -> UrlValidationResult {
     }
 
     if trimmed.len() >= 5
-        && trimmed[..5].eq_ignore_ascii_case("file:")
-        && !trimmed.starts_with("file:///")
+        && trimmed.as_bytes()[..5].eq_ignore_ascii_case(b"file:")
+        && (trimmed.len() < 7 || !trimmed.as_bytes()[..7].eq_ignore_ascii_case(b"file://"))
     {
         return UrlValidationResult::Invalid;
     }
-    if trimmed.len() >= 6 && trimmed[..6].eq_ignore_ascii_case("data:/") {
+    if trimmed.len() >= 6 && trimmed.as_bytes()[..6].eq_ignore_ascii_case(b"data:/") {
         return UrlValidationResult::Invalid;
     }
 

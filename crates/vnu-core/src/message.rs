@@ -72,6 +72,21 @@ impl VNuMessage {
             hilite_length: None,
         }
     }
+
+    pub fn info(message: impl Into<String>, line: usize, col: usize) -> Self {
+        Self {
+            msg_type: MessageType::Info,
+            sub_type: None,
+            message: message.into(),
+            extract: None,
+            last_line: Some(line),
+            first_line: Some(line),
+            last_column: Some(col),
+            first_column: Some(col),
+            hilite_start: None,
+            hilite_length: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]

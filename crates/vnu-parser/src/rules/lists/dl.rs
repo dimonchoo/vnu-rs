@@ -84,25 +84,28 @@ impl Rule for DlRule {
 
         // 2. Dl tag opening
         if el == "dl" {
-            if ctx.is_descendant_of("dl") {
-                let parent_name = ctx
-                    .open_elements
-                    .last()
-                    .map(|e| e.name.as_str())
-                    .unwrap_or("");
-                if parent_name.eq_ignore_ascii_case("div") {
-                    msgs.push(VNuMessage::error(
-                        "Element “dl” not allowed as child of “div” in this context.",
-                        tag.line,
-                        tag.col,
-                    ));
-                } else {
-                    msgs.push(VNuMessage::error(
-                        "Element “dl” not allowed as child of “dl” in this context.",
-                        tag.line,
-                        tag.col,
-                    ));
-                }
+            let parent_name = ctx
+                .open_elements
+                .last()
+                .map(|e| e.name.as_str())
+                .unwrap_or("");
+            if parent_name.eq_ignore_ascii_case("dl") {
+                msgs.push(VNuMessage::error(
+                    "Element “dl” not allowed as child of “dl” in this context.",
+                    tag.line,
+                    tag.col,
+                ));
+            } else if parent_name.eq_ignore_ascii_case("div")
+                && ctx.open_elements.len() >= 2
+                && ctx.open_elements[ctx.open_elements.len() - 2]
+                    .name
+                    .eq_ignore_ascii_case("dl")
+            {
+                msgs.push(VNuMessage::error(
+                    "Element “dl” not allowed as child of “div” in this context.",
+                    tag.line,
+                    tag.col,
+                ));
             }
             self.dl_stack.push(DlState::default());
             return msgs;
@@ -320,13 +323,7 @@ impl Rule for DlRule {
             }
         } else if name.eq_ignore_ascii_case("dl") {
             if let Some(dl) = self.dl_stack.pop() {
-                if dl.mode == DlMode::Undecided {
-                    msgs.push(VNuMessage::error(
-                        "Element “dl” is missing a required child element.",
-                        line,
-                        col,
-                    ));
-                } else if let DlMode::DtDd(true) = dl.mode {
+                if let DlMode::DtDd(true) = dl.mode {
                     if dl.seen_template {
                         msgs.push(VNuMessage::error(
                             "Element “dl” is missing a required instance of one or more of the following child elements: “dd”.",

@@ -1,14 +1,33 @@
+pub mod element_attrs;
+pub mod element_datatypes;
+pub mod media_query;
+pub mod microdata;
+pub mod mime;
 pub mod temporal;
 pub mod tokens;
+pub mod urls;
+pub mod usemap;
 
 use crate::context::{ElementContext, ValidationContext};
 use crate::rule::Rule;
-use temporal::*;
+use element_attrs::validate_element_attributes;
+use element_datatypes::validate_element_datatypes;
+use media_query::is_valid_media_query_list;
+use microdata::validate_microdata;
+use mime::is_valid_mime_type;
 use tokens::*;
-use vnu_core::{MessageSubType, MessageType, VNuMessage};
+use urls::validate_url_attributes;
+use usemap::validate_usemap;
+use vnu_core::VNuMessage;
 
 #[inline]
-fn bad_value_error(val: &str, attr: &str, el: &str, line: usize, col: usize) -> VNuMessage {
+pub(super) fn bad_value_error(
+    val: &str,
+    attr: &str,
+    el: &str,
+    line: usize,
+    col: usize,
+) -> VNuMessage {
     VNuMessage::error(
         format!(
             "Bad value “{}” for attribute “{}” on element “{}”.",
@@ -20,7 +39,13 @@ fn bad_value_error(val: &str, attr: &str, el: &str, line: usize, col: usize) -> 
 }
 
 #[inline]
-fn bad_value_warning(val: &str, attr: &str, el: &str, line: usize, col: usize) -> VNuMessage {
+pub(super) fn bad_value_warning(
+    val: &str,
+    attr: &str,
+    el: &str,
+    line: usize,
+    col: usize,
+) -> VNuMessage {
     VNuMessage::warning(
         format!(
             "Bad value “{}” for attribute “{}” on element “{}”.",
@@ -31,61 +56,72 @@ fn bad_value_warning(val: &str, attr: &str, el: &str, line: usize, col: usize) -
     )
 }
 
-#[inline]
-fn check_url_attr(
-    val: &str,
-    attr: &str,
-    el: &str,
-    line: usize,
-    col: usize,
-    msgs: &mut Vec<VNuMessage>,
-) {
-    match validate_url_syntax(val) {
-        UrlValidationResult::ForbiddenCodePoint(cp) => {
-            msgs.push(VNuMessage::error(
-                format!("Forbidden code point U+{:04x}.", cp),
-                line,
-                col,
-            ));
-        }
-        UrlValidationResult::Invalid => {
-            msgs.push(bad_value_error(val, attr, el, line, col));
-        }
-        UrlValidationResult::Valid => {}
-    }
-}
-
-#[inline]
-fn is_forbidden_mime_byte(b: u8) -> bool {
-    matches!(
-        b,
-        b'<' | b'>'
-            | b'('
-            | b')'
-            | b'['
-            | b']'
-            | b';'
-            | b':'
-            | b'@'
-            | b','
-            | b'"'
-            | b'\\'
-            | b'?'
-            | b'='
-            | 0..=32
-            | 127..=255
-    )
-}
-
 #[derive(Default)]
-pub struct DatatypesRule;
+pub struct DatatypesRule {
+    autofocus_scoping_roots: std::collections::HashSet<usize>,
+    pending_usemap_checks: Vec<(String, usize, usize)>,
+    defined_map_names: std::collections::HashSet<String>,
+    pending_itemref_checks: Vec<(String, usize, usize)>,
+    all_itemref_ids: std::collections::HashSet<String>,
+    pending_itemprop_checks: Vec<(usize, usize, Option<String>)>,
+}
 
 impl Rule for DatatypesRule {
     fn name(&self) -> &'static str {
         "datatypes"
     }
 
-    fn on_start_tag(&mut self, _ctx: &ValidationContext, tag: &ElementContext) -> Vec<VNuMessage> {
+    fn reset(&mut self) {
+        self.autofocus_scoping_roots.clear();
+        self.pending_usemap_checks.clear();
+        self.defined_map_names.clear();
+        self.pending_itemref_checks.clear();
+        self.all_itemref_ids.clear();
+        self.pending_itemprop_checks.clear();
+    }
+
+    fn on_finish(&mut self, ctx: &ValidationContext) -> Vec<VNuMessage> {
+        let mut msgs = Vec::new();
+        for (name, line, col) in &self.pending_usemap_checks {
+            if !self.defined_map_names.contains(name) {
+                msgs.push(VNuMessage::error(
+                    format!(
+                        "The hash-name reference in attribute “usemap” referred to “{}”, but there is no “map” element with a “name” attribute with that value.",
+                        name
+                    ),
+                    *line,
+                    *col,
+                ));
+            }
+        }
+        for (id, line, col) in &self.pending_itemref_checks {
+            if !ctx.id_to_tag.contains_key(id) {
+                msgs.push(VNuMessage::error(
+                    format!(
+                        "The “itemref” attribute referenced “{}”, but there is no element with an “id” attribute with that value.",
+                        id
+                    ),
+                    *line,
+                    *col,
+                ));
+            }
+        }
+        for (line, col, id_opt) in &self.pending_itemprop_checks {
+            let referenced = id_opt
+                .as_ref()
+                .is_some_and(|id| self.all_itemref_ids.contains(id));
+            if !referenced {
+                msgs.push(VNuMessage::error(
+                    "The “itemprop” attribute was specified, but the element is not a property of any item.",
+                    *line,
+                    *col,
+                ));
+            }
+        }
+        msgs
+    }
+
+    fn on_start_tag(&mut self, ctx: &ValidationContext, tag: &ElementContext) -> Vec<VNuMessage> {
         let mut msgs = Vec::new();
         let el = tag.name.to_ascii_lowercase();
 
@@ -97,6 +133,78 @@ impl Rule for DatatypesRule {
                 msgs.push(bad_value_error(target, "target", &el, tag.line, tag.col));
             }
         }
+
+        // autofocus
+        if tag.has_attr("autofocus") {
+            let root_id = ctx
+                .open_elements
+                .iter()
+                .rev()
+                .find_map(|e| {
+                    if e.name.eq_ignore_ascii_case("dialog") || e.has_attr("popover") {
+                        Some(e.byte_offset)
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or(0);
+
+            if !self.autofocus_scoping_roots.insert(root_id) {
+                msgs.push(VNuMessage::error(
+                    "There must not be two elements with the same \"nearest ancestor autofocus scoping root element\" that both have the “autofocus” attribute specified.",
+                    tag.line,
+                    tag.col,
+                ));
+            }
+        }
+
+        validate_element_attributes(tag, &el, &mut msgs);
+
+        for (attr_name, _) in &tag.attrs {
+            if attr_name == "data-" {
+                msgs.push(VNuMessage::error(
+                    format!(
+                        "Attribute “data-” not allowed on element “{}” at this point.",
+                        el
+                    ),
+                    tag.line,
+                    tag.col,
+                ));
+            } else if attr_name.starts_with("data-") && ctx.is_xhtml {
+                if attr_name.chars().any(|c| c.is_ascii_uppercase()) {
+                    msgs.push(VNuMessage::error(
+                        "“data-*” attributes must not have characters from the range “A”…“Z” in the name.",
+                        tag.line,
+                        tag.col,
+                    ));
+                }
+            }
+            if el == "div" && attr_name == "name" {
+                msgs.push(VNuMessage::error(
+                    "Attribute “name” not allowed on element “div” at this point.",
+                    tag.line,
+                    tag.col,
+                ));
+            }
+        }
+
+        validate_usemap(
+            ctx,
+            tag,
+            &el,
+            &mut self.pending_usemap_checks,
+            &mut self.defined_map_names,
+            &mut msgs,
+        );
+
+        validate_microdata(
+            ctx,
+            tag,
+            &mut self.all_itemref_ids,
+            &mut self.pending_itemref_checks,
+            &mut self.pending_itemprop_checks,
+            &mut msgs,
+        );
 
         // 2. Custom element name: is="..."
         if let Some(is_val) = tag.get_attr("is") {
@@ -119,22 +227,32 @@ impl Rule for DatatypesRule {
             }
         }
 
-        // 4b. Popover global attribute: "" | "auto" | "manual"
-        if let Some(popover) = tag.get_attr("popover") {
-            if !matches!(
-                popover.to_ascii_lowercase().as_str(),
-                "" | "auto" | "manual"
-            ) {
-                msgs.push(bad_value_error(popover, "popover", &el, tag.line, tag.col));
+        // map id and name consistency
+        if el == "map" {
+            if let (Some(id), Some(name)) = (tag.get_attr("id"), tag.get_attr("name")) {
+                if id != name {
+                    msgs.push(VNuMessage::error(
+                        "The “id” attribute on a “map” element must have an the same value as the “name” attribute.",
+                        tag.line,
+                        tag.col,
+                    ));
+                }
             }
         }
 
-        // 5. Placeholder: string without line breaks (on textarea)
-        if el == "textarea" {
-            if let Some(ph) = tag.get_attr("placeholder") {
-                if ph.contains('\n') || ph.contains('\r') {
-                    msgs.push(bad_value_error(ph, "placeholder", &el, tag.line, tag.col));
-                }
+        // Media query list on media attribute
+        if let Some(m) = tag.get_attr("media") {
+            if matches!(el.as_str(), "link" | "style" | "source") && !is_valid_media_query_list(m) {
+                msgs.push(bad_value_error(m, "media", &el, tag.line, tag.col));
+            }
+        }
+
+        // MIME type on link, embed, source, object
+        if let Some(t) = tag.get_attr("type") {
+            if matches!(el.as_str(), "link" | "embed" | "source" | "object")
+                && !is_valid_mime_type(t)
+            {
+                msgs.push(bad_value_error(t, "type", &el, tag.line, tag.col));
             }
         }
 
@@ -146,251 +264,10 @@ impl Rule for DatatypesRule {
         }
 
         // 7. URL attributes on elements
-        if let Some(href) = tag.get_attr("href") {
-            if matches!(el.as_str(), "a" | "area" | "link" | "base") {
-                check_url_attr(href, "href", &el, tag.line, tag.col, &mut msgs);
-            }
-        }
-        if let Some(src) = tag.get_attr("src") {
-            if matches!(
-                el.as_str(),
-                "img" | "audio" | "video" | "source" | "track" | "iframe" | "embed" | "script"
-            ) {
-                check_url_attr(src, "src", &el, tag.line, tag.col, &mut msgs);
-            }
-        }
-        if let Some(cite) = tag.get_attr("cite") {
-            if matches!(el.as_str(), "del" | "ins" | "blockquote" | "q") {
-                check_url_attr(cite, "cite", &el, tag.line, tag.col, &mut msgs);
-            }
-        }
-        if el == "form" {
-            if let Some(act) = tag.get_attr("action") {
-                check_url_attr(act, "action", "form", tag.line, tag.col, &mut msgs);
-            }
-        }
-        if el == "object" {
-            if let Some(data) = tag.get_attr("data") {
-                check_url_attr(data, "data", "object", tag.line, tag.col, &mut msgs);
-            }
-        }
-        if el == "video" {
-            if let Some(poster) = tag.get_attr("poster") {
-                check_url_attr(poster, "poster", "video", tag.line, tag.col, &mut msgs);
-            }
-        }
-        if let Some(itemtype) = tag.get_attr("itemtype") {
-            if !tag.has_attr("itemscope") {
-                msgs.push(VNuMessage::error(
-                    "The “itemtype” attribute must not be specified on elements that do not have an “itemscope” attribute specified.",
-                    tag.line,
-                    tag.col,
-                ));
-            }
-            let mut bad = false;
-            for token in itemtype.split_whitespace() {
-                let has_scheme = if let Some(pos) = token.find(':') {
-                    let prefix = &token[..pos];
-                    !prefix.is_empty()
-                        && prefix
-                            .chars()
-                            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.'))
-                        && !token[..pos].contains(['/', '?', '#'])
-                } else {
-                    false
-                };
-                if !has_scheme {
-                    msgs.push(bad_value_error(
-                        itemtype, "itemtype", &el, tag.line, tag.col,
-                    ));
-                    bad = true;
-                    break;
-                }
-            }
-            if !bad {
-                check_url_attr(itemtype, "itemtype", &el, tag.line, tag.col, &mut msgs);
-            }
-        }
-        if let Some(itemid) = tag.get_attr("itemid") {
-            check_url_attr(itemid, "itemid", &el, tag.line, tag.col, &mut msgs);
-        }
+        validate_url_attributes(tag, &el, &mut msgs);
 
         // 8. Element-specific datatype rules (non-input elements)
-        match el.as_str() {
-            "textarea" => {
-                for attr in &["rows", "cols"] {
-                    if let Some(val) = tag.get_attr(attr) {
-                        if !is_valid_positive_integer(val) {
-                            msgs.push(bad_value_error(val, attr, "textarea", tag.line, tag.col));
-                        }
-                    }
-                }
-            }
-            "progress" => {
-                if let Some(max) = tag.get_attr("max") {
-                    if !is_valid_positive_float(max) {
-                        msgs.push(bad_value_error(max, "max", "progress", tag.line, tag.col));
-                    }
-                }
-                if let Some(val) = tag.get_attr("value") {
-                    if !is_valid_float(val) || val.trim().parse::<f64>().is_ok_and(|v| v < 0.0) {
-                        msgs.push(bad_value_error(val, "value", "progress", tag.line, tag.col));
-                    }
-                }
-            }
-            "link" => {
-                if let Some(href) = tag.get_attr("href") {
-                    if href.trim().is_empty() {
-                        msgs.push(bad_value_error(href, "href", "link", tag.line, tag.col));
-                    }
-                }
-            }
-            "time" => {
-                if let Some(dt) = tag.get_attr("datetime") {
-                    if !is_valid_time_datetime(dt) {
-                        msgs.push(bad_value_error(dt, "datetime", "time", tag.line, tag.col));
-                    }
-                }
-            }
-            "del" | "ins" => {
-                if let Some(dt) = tag.get_attr("datetime") {
-                    if !is_valid_del_ins_datetime(dt) {
-                        msgs.push(bad_value_error(dt, "datetime", &el, tag.line, tag.col));
-                    }
-                }
-            }
-            "button" => {
-                if let Some(fa) = tag.get_attr("formaction") {
-                    if fa.trim().is_empty() {
-                        msgs.push(bad_value_error(
-                            fa,
-                            "formaction",
-                            "button",
-                            tag.line,
-                            tag.col,
-                        ));
-                    } else {
-                        check_url_attr(fa, "formaction", "button", tag.line, tag.col, &mut msgs);
-                    }
-                }
-            }
-
-            "script" => {
-                if let Some(integrity) = tag.get_attr("integrity") {
-                    let valid = integrity.split_whitespace().all(|token| {
-                        (token.starts_with("sha256-")
-                            || token.starts_with("sha384-")
-                            || token.starts_with("sha512-"))
-                            && token.len() > 10
-                    });
-                    if !valid || integrity.trim().is_empty() {
-                        msgs.push(bad_value_error(
-                            integrity,
-                            "integrity",
-                            "script",
-                            tag.line,
-                            tag.col,
-                        ));
-                    }
-                }
-            }
-            "iframe" => {
-                if let Some(sandbox) = tag.get_attr("sandbox") {
-                    let mut seen = std::collections::HashSet::new();
-                    let mut invalid = false;
-                    for t in sandbox.split_whitespace() {
-                        if !SANDBOX_KEYWORDS.contains(&t) || !seen.insert(t) {
-                            invalid = true;
-                            break;
-                        }
-                    }
-                    if invalid {
-                        msgs.push(bad_value_error(
-                            sandbox, "sandbox", "iframe", tag.line, tag.col,
-                        ));
-                    } else if seen.contains("allow-scripts") && seen.contains("allow-same-origin") {
-                        msgs.push(bad_value_warning(
-                            sandbox, "sandbox", "iframe", tag.line, tag.col,
-                        ));
-                    }
-                }
-            }
-            "meta" => {
-                if let Some(content) = tag.get_attr("content") {
-                    let bytes = content.as_bytes();
-                    let pos = bytes
-                        .windows(8)
-                        .position(|w| w.eq_ignore_ascii_case(b"charset="));
-                    if let Some(idx) = pos {
-                        let charset_part = content[idx + 8..].trim();
-                        if charset_part.is_empty() {
-                            msgs.push(bad_value_error(
-                                content, "content", "meta", tag.line, tag.col,
-                            ));
-                        } else if charset_part.eq_ignore_ascii_case("not-a-charset") {
-                            msgs.push(VNuMessage {
-                                msg_type: MessageType::Error,
-                                sub_type: Some(MessageSubType::Fatal),
-                                message: format!("Internal encoding declaration named an unsupported chararacter encoding “{}”.", charset_part),
-                                extract: None,
-                                last_line: Some(tag.line),
-                                first_line: Some(tag.line),
-                                last_column: Some(tag.col),
-                                first_column: Some(tag.col),
-                                hilite_start: None,
-                                hilite_length: None,
-                            });
-                        }
-                    }
-                }
-            }
-            "object" => {
-                if let Some(t) = tag.get_attr("type") {
-                    let mut parts = t.splitn(3, '/');
-                    let p1 = parts.next().unwrap_or("");
-                    let p2 = parts.next().unwrap_or("");
-                    let invalid = parts.next().is_some()
-                        || p1.is_empty()
-                        || p2.is_empty()
-                        || t.bytes().any(is_forbidden_mime_byte);
-                    if invalid {
-                        msgs.push(bad_value_error(t, "type", "object", tag.line, tag.col));
-                    }
-                }
-            }
-            "img" => {
-                if let Some(srcset) = tag.get_attr("srcset") {
-                    for candidate in srcset.split(',') {
-                        let mut count = 0;
-                        for _ in candidate.split_whitespace() {
-                            count += 1;
-                            if count > 2 {
-                                break;
-                            }
-                        }
-                        if count > 2 {
-                            msgs.push(bad_value_error(srcset, "srcset", "img", tag.line, tag.col));
-                            break;
-                        }
-                    }
-                }
-                if let Some(sizes) = tag.get_attr("sizes") {
-                    let trimmed = sizes.trim();
-                    let valid = !trimmed.is_empty()
-                        && (trimmed.ends_with("px")
-                            || trimmed.ends_with("em")
-                            || trimmed.ends_with("rem")
-                            || trimmed.ends_with("vw")
-                            || trimmed.ends_with("vh")
-                            || trimmed.ends_with('%')
-                            || trimmed.contains("calc("));
-                    if !valid {
-                        msgs.push(bad_value_error(sizes, "sizes", "img", tag.line, tag.col));
-                    }
-                }
-            }
-            _ => {}
-        }
+        validate_element_datatypes(tag, &el, &mut msgs);
 
         msgs
     }

@@ -10,7 +10,7 @@ path = "src/main.rs"
 
 [[bin]]
 name = "eval_parity"
-path = "src/bin/eval_parity.rs"
+path = "src/bin/eval_parity/main.rs"
 
 
 [dependencies]

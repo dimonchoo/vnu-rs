@@ -33,7 +33,73 @@ impl Rule for HyperlinksRule {
         let mut msgs = Vec::new();
         let name_lower = tag.name.to_ascii_lowercase();
 
-        if name_lower == "a" {
+        if let Some(rel) = tag.get_attr("rel") {
+            let typo = match rel {
+                "alternat" => Some("alternate"),
+                "authr" => Some("author"),
+                "canonicl" => Some("canonical"),
+                "styleshet" => Some("stylesheet"),
+                _ => None,
+            };
+            if let Some(suggest) = typo {
+                msgs.push(VNuMessage::info(
+                    format!(
+                        "Bad value “{}” for attribute “rel” on element “{}”: Bad list of link-type keywords:  Typo for “{}”?",
+                        rel, name_lower, suggest
+                    ),
+                    tag.line,
+                    tag.col,
+                ));
+            } else if rel
+                .split_ascii_whitespace()
+                .any(|tok| tok.eq_ignore_ascii_case("noindex"))
+            {
+                msgs.push(VNuMessage::info(
+                    format!(
+                        "Potentially bad value “{}” for attribute “rel” on element “{}” Typo for “index”?",
+                        rel, name_lower
+                    ),
+                    tag.line,
+                    tag.col,
+                ));
+            }
+        }
+
+        if name_lower == "a" && !ctx.is_descendant_of("svg") {
+            for (attr, _) in &tag.attrs {
+                let attr_lower = attr.to_ascii_lowercase();
+                if !crate::rules::forms::input::allowed::is_global_or_common_attr(&attr_lower)
+                    && !matches!(
+                        attr_lower.as_str(),
+                        "href"
+                            | "target"
+                            | "download"
+                            | "ping"
+                            | "rel"
+                            | "hreflang"
+                            | "type"
+                            | "referrerpolicy"
+                            | "coords"
+                            | "shape"
+                            | "urn"
+                            | "methods"
+                            | "rev"
+                            | "charset"
+                            | "name"
+                            | "media"
+                    )
+                {
+                    msgs.push(VNuMessage::error(
+                        format!(
+                            "Attribute “{}” not allowed on element “a” at this point.",
+                            attr
+                        ),
+                        tag.line,
+                        tag.col,
+                    ));
+                }
+            }
+
             if (tag.has_attr("download") || tag.has_attr("ping")) && !tag.has_attr("href") {
                 msgs.push(VNuMessage::error(
                     "Element “a” is missing required attribute “href”.",
@@ -85,14 +151,7 @@ impl Rule for HyperlinksRule {
                 ));
             }
 
-            if let Some(href) = tag.get_attr("href") {
-                if href.is_empty() {
-                    msgs.push(VNuMessage::error(
-                        "Element “area” is missing required attribute “href”.",
-                        tag.line,
-                        tag.col,
-                    ));
-                }
+            if tag.get_attr("href").is_some() {
                 if !tag.has_attr("alt") {
                     msgs.push(VNuMessage::error(
                         "Element “area” is missing required attribute “alt”.",

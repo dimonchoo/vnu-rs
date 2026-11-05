@@ -151,6 +151,9 @@ pub fn is_valid_time_datetime(val: &str) -> bool {
         || is_valid_month(s)
         || is_valid_week(s)
         || is_valid_datetime_local(s)
+        || (s.len() >= 4
+            && s.bytes().all(|b| b.is_ascii_digit())
+            && s.parse::<u32>().is_ok_and(|y| y >= 1))
     {
         return true;
     }
@@ -170,7 +173,7 @@ pub fn is_valid_time_datetime(val: &str) -> bool {
             return true;
         }
     }
-    if s.starts_with('P') || s.starts_with('p') {
+    if (s.starts_with('P') || s.starts_with('p')) && !s.contains(['Y', 'y']) {
         return true;
     }
     false

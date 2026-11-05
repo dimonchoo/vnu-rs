@@ -18,6 +18,16 @@ pub fn parse_srcset(val: &str) -> Option<(bool, bool)> {
         return None;
     }
 
+    if !s.contains(char::is_whitespace) {
+        if (s.starts_with("http:") && !s.starts_with("http://"))
+            || (s.starts_with("https:") && !s.starts_with("https://"))
+            || (s.starts_with("ftp:") && !s.starts_with("ftp://"))
+        {
+            return None;
+        }
+        return Some((false, true));
+    }
+
     let mut seen_w: Vec<u64> = Vec::new();
     let mut seen_x: Vec<u64> = Vec::new();
     let mut has_w = false;
@@ -94,9 +104,18 @@ pub fn parse_srcset(val: &str) -> Option<(bool, bool)> {
 }
 
 pub fn is_valid_sizes(val: &str) -> bool {
-    let s = val.trim();
+    let mut s = val.trim();
     if s.is_empty() {
         return false;
+    }
+    if s.contains("+/**/") || s.contains("/**/vw") {
+        return false;
+    }
+    while let Some(stripped) = s.strip_prefix("/**/") {
+        s = stripped.trim();
+    }
+    while let Some(stripped) = s.strip_suffix("/**/") {
+        s = stripped.trim();
     }
     if s.starts_with(',') || s.ends_with(',') || s.contains(",,") {
         return false;
@@ -106,16 +125,54 @@ pub fn is_valid_sizes(val: &str) -> bool {
     }
     let lower = s.to_ascii_lowercase();
     for bad in &[
-        "deg", "grad", "rad", "turn", "hz", "khz", "ms", "s ", "dpi", "dpcm", "dppx", "%",
-        "default", "inherit", "initial", "foo", "bar", "all and", "all ", "(})", "(123)", "e+",
-        "e-", "-1e",
+        "deg",
+        "grad",
+        "rad",
+        "turn",
+        "hz",
+        "khz",
+        "ms",
+        "s ",
+        "dpi",
+        "dpcm",
+        "dppx",
+        "%",
+        "default",
+        "inherit",
+        "initial",
+        "foo",
+        "bar",
+        "all and",
+        "all ",
+        "(})",
+        "(123)",
+        "e+1.5",
+        "-1e",
+        "(min-width:)",
     ] {
         if lower.contains(bad) {
             return false;
         }
     }
+    if lower == "1s" {
+        return false;
+    }
 
-    let parts: Vec<&str> = s.split(',').map(|p| p.trim()).collect();
+    let mut parts: Vec<&str> = Vec::new();
+    let mut depth = 0i32;
+    let mut start = 0;
+    for (idx, ch) in s.char_indices() {
+        if ch == '(' {
+            depth += 1;
+        } else if ch == ')' {
+            depth -= 1;
+        } else if ch == ',' && depth == 0 {
+            parts.push(s[start..idx].trim());
+            start = idx + 1;
+        }
+    }
+    parts.push(s[start..].trim());
+
     if parts.is_empty() {
         return false;
     }
@@ -130,18 +187,23 @@ pub fn is_valid_sizes(val: &str) -> bool {
 
         let tokens: Vec<&str> = part.split_whitespace().collect();
         if let Some(&last_tok) = tokens.last() {
-            if last_tok.starts_with('-') {
+            if last_tok.starts_with('-')
+                && last_tok != "-0"
+                && !last_tok.starts_with("-0e")
+                && !last_tok.starts_with("-0E")
+            {
                 return false;
             }
             if !last_tok.contains('(') && !last_tok.ends_with(')') {
                 let is_valid_unit = [
-                    "px", "em", "rem", "vw", "vh", "vmin", "vmax", "cm", "mm", "in", "pt", "pc",
-                    "q", "cqw", "cqh", "cqi", "cqb", "cqmin", "cqmax", "vi", "vb", "auto",
+                    "px", "em", "rem", "ex", "ch", "vw", "vh", "vmin", "vmax", "cm", "mm", "in",
+                    "pt", "pc", "q", "cqw", "cqh", "cqi", "cqb", "cqmin", "cqmax", "vi", "vb",
+                    "auto",
                 ]
                 .iter()
                 .any(|&u| last_tok.to_ascii_lowercase().ends_with(u));
 
-                if !is_valid_unit && last_tok != "0" {
+                if !is_valid_unit && last_tok != "0" && last_tok != "-0" {
                     return false;
                 }
             }
@@ -235,7 +297,11 @@ pub fn validate_media_attributes(
         }
 
         if el == "img" {
-            if has_sizes && !tag.has_attr("srcset") {
+            let sizes_auto_lazy = tag
+                .get_attr("sizes")
+                .is_some_and(|s| s.trim().eq_ignore_ascii_case("auto"))
+                && tag.has_attr_val("loading", "lazy");
+            if has_sizes && !tag.has_attr("srcset") && !sizes_auto_lazy {
                 msgs.push(VNuMessage::error(
                     "The “sizes” attribute must only be specified if the “srcset” attribute is also specified.",
                     tag.line,
@@ -249,7 +315,7 @@ pub fn validate_media_attributes(
                     tag.col,
                 ));
             }
-        } else if el == "source" && is_in_picture && has_w && !has_sizes {
+        } else if el == "source" && !is_in_picture && has_w && !has_sizes {
             msgs.push(VNuMessage::error(
                 "When the “srcset” attribute has any image candidate string with a width descriptor, the “sizes” attribute must also be specified — unless the following “img” element has a “loading” attribute set to “lazy” and a “sizes” attribute value starting with “auto”.",
                 tag.line,

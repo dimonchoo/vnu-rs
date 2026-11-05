@@ -8,11 +8,15 @@ pub fn handle_tag_open(bytes: &[u8], idx: usize, src: &str, msgs: &mut Vec<VNuMe
     let next = bytes[idx + 1];
 
     if next == b'?' {
-        msgs.push(VNuMessage::error(
-            "Saw “<?”. Probable cause: Attempt to use an XML processing instruction in HTML. (XML processing instructions are not supported in HTML.)".to_string(),
-            1,
-            1,
-        ));
+        if !src.trim_start().starts_with("<?xml")
+            && memchr::memmem::find(src.as_bytes(), b"http://www.w3.org/1999/xhtml").is_none()
+        {
+            msgs.push(VNuMessage::error(
+                "Saw “<?”. Probable cause: Attempt to use an XML processing instruction in HTML. (XML processing instructions are not supported in HTML.)".to_string(),
+                1,
+                1,
+            ));
+        }
         return 2;
     }
 
@@ -31,7 +35,9 @@ pub fn handle_tag_open(bytes: &[u8], idx: usize, src: &str, msgs: &mut Vec<VNuMe
     }
 
     let rest = &bytes[idx + 1..];
-    if rest.starts_with(b"image ") || rest.starts_with(b"image>") || rest.starts_with(b"image/") {
+    if (rest.starts_with(b"image ") || rest.starts_with(b"image>") || rest.starts_with(b"image/"))
+        && memchr::memmem::find(src.as_bytes(), b"<svg").is_none()
+    {
         msgs.push(VNuMessage::error(
             "Saw a start tag “image”.".to_string(),
             1,
@@ -100,9 +106,11 @@ fn handle_end_tag(bytes: &[u8], idx: usize, src: &str, msgs: &mut Vec<VNuMessage
         if tag_str.trim().eq_ignore_ascii_case("br") {
             msgs.push(VNuMessage::error("End tag “br”.".to_string(), 1, 1));
         }
-        if tag_str.trim().eq_ignore_ascii_case("src")
+        if (tag_str.trim().eq_ignore_ascii_case("src")
             || tag_str.trim().eq_ignore_ascii_case("style/")
-            || (tag_str.trim().eq_ignore_ascii_case("style") && src.contains("<script"))
+            || tag_str.trim().eq_ignore_ascii_case("style"))
+            && src.contains("<script")
+            && !src.contains("</script")
         {
             msgs.push(VNuMessage::error(
                 "End of file seen when expecting text or an end tag.".to_string(),

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nu Html Checker (vnu-rs)</title>
+<style>
+/* __STYLE__ */
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="header-top">
+      <h1>
+        <span>Nu Html Checker</span>
+        <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: normal;">(vnu-rs)</span>
+      </h1>
+      <div class="badge-parity">
+        <span>✓</span> 100% W3C Parity (5,824 / 5,824)
+      </div>
+    </div>
+    <div class="subtitle">High-performance Rust W3C HTML5 / WHATWG Conformance Checker</div>
+  </header>
+
+  <div class="card">
+    <nav class="tabs-nav">
+      <button class="tab-btn active" data-tab="direct">Text Input</button>
+      <button class="tab-btn" data-tab="file">File Upload</button>
+      <button class="tab-btn" data-tab="url">Address (URL)</button>
+    </nav>
+
+    <div class="tab-pane active" id="tab-direct">
+      <textarea id="direct-editor" class="editor" spellcheck="false" placeholder="Paste your HTML document markup here..."></textarea>
+    </div>
+
+    <div class="tab-pane" id="tab-file">
+      <div class="dropzone" id="file-dropzone">
+        <div class="dropzone-icon">📁</div>
+        <div class="dropzone-title">Click to choose or drag &amp; drop an HTML file</div>
+        <div class="dropzone-sub">Supports .html, .htm, .xhtml, .svg (max 10MB)</div>
+        <input type="file" id="file-input" class="hidden" accept=".html,.htm,.xhtml,.svg,text/html">
+        <div id="file-name" class="file-selected hidden"></div>
+      </div>
+    </div>
+
+    <div class="tab-pane" id="tab-url">
+      <div class="url-input-wrap">
+        <input type="url" id="url-input" class="url-input" placeholder="https://example.com/page.html">
+      </div>
+      <div class="url-note">Note: URL is fetched directly by your browser and validated through vnu-rs. Ensure target allows CORS or is local.</div>
+    </div>
+
+    <div class="action-bar">
+      <div class="options-group">
+        <label class="option-label">
+          <input type="checkbox" id="opt-show-source" checked>
+          <span>Show source code</span>
+        </label>
+        <label class="option-label">
+          <input type="checkbox" id="opt-warnings-only" checked>
+          <span>Errors &amp; warnings only</span>
+        </label>
+      </div>
+
+      <div class="btn-group">
+        <button class="btn btn-secondary" id="btn-sample">Sample HTML</button>
+        <button class="btn btn-secondary" id="btn-clear">Clear</button>
+        <button class="btn btn-primary" id="btn-validate">
+          <span id="btn-spinner" class="spinner hidden"></span>
+          <span id="btn-text">Check HTML</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="results-area" class="hidden">
+    <div id="status-banner" class="status-banner">
+      <div class="status-title" id="status-title">Checking completed.</div>
+      <div class="status-meta" id="status-meta"></div>
+    </div>
+
+    <div class="messages-list" id="messages-list"></div>
+
+    <div class="source-viewer-wrap hidden" id="source-wrap">
+      <div class="source-viewer-title">Validated Document Source</div>
+      <div class="source-container" id="source-container"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* __SCRIPT__ */
+</script>
+</body>
+</html>

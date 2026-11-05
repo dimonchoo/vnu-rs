@@ -17,7 +17,7 @@ impl Rule for DoctypeRule {
     }
 
     fn on_start_tag(&mut self, ctx: &ValidationContext, tag: &ElementContext) -> Vec<VNuMessage> {
-        if ctx.mode == crate::context::DocumentMode::Svg {
+        if ctx.mode == crate::context::DocumentMode::Svg || ctx.is_xhtml {
             return vec![];
         }
         if !ctx.doctype_seen && !self.emitted {

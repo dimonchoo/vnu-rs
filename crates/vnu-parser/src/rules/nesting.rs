@@ -3,11 +3,17 @@ use crate::rule::Rule;
 use vnu_core::VNuMessage;
 
 #[derive(Default)]
-pub struct NestingRule;
+pub struct NestingRule {
+    optgroup_missing_label: Vec<Option<(usize, usize)>>,
+}
 
 impl Rule for NestingRule {
     fn name(&self) -> &'static str {
         "nesting"
+    }
+
+    fn reset(&mut self) {
+        self.optgroup_missing_label.clear();
     }
 
     fn handles_character_tokens(&self) -> bool {
@@ -49,6 +55,92 @@ impl Rule for NestingRule {
             ));
         }
 
+        if name_lower == "address" && ctx.is_descendant_of("address") {
+            msgs.push(VNuMessage::error(
+                "The element “address” must not appear as a descendant of the “address” element.",
+                tag.line,
+                tag.col,
+            ));
+        }
+
+        if name_lower == "header" {
+            if ctx.is_descendant_of("header") {
+                msgs.push(VNuMessage::error(
+                    "The element “header” must not appear as a descendant of the “header” element.",
+                    tag.line,
+                    tag.col,
+                ));
+            }
+            if ctx.is_descendant_of("footer") {
+                msgs.push(VNuMessage::error(
+                    "The element “header” must not appear as a descendant of the “footer” element.",
+                    tag.line,
+                    tag.col,
+                ));
+            }
+        }
+
+        if name_lower == "footer" {
+            if ctx.is_descendant_of("footer") {
+                msgs.push(VNuMessage::error(
+                    "The element “footer” must not appear as a descendant of the “footer” element.",
+                    tag.line,
+                    tag.col,
+                ));
+            }
+            if ctx.is_descendant_of("header") {
+                msgs.push(VNuMessage::error(
+                    "The element “footer” must not appear as a descendant of the “header” element.",
+                    tag.line,
+                    tag.col,
+                ));
+            }
+        }
+
+        if name_lower == "audio" && tag.has_attr("controls") && ctx.is_descendant_of("button") {
+            msgs.push(VNuMessage::error(
+                "The element “audio” with the attribute “controls” must not appear as a descendant of the “button” element.",
+                tag.line,
+                tag.col,
+            ));
+        }
+
+        if name_lower == "bdo" {
+            if let Some(dir) = tag.get_attr("dir") {
+                if dir.eq_ignore_ascii_case("auto")
+                    || !matches!(dir.to_ascii_lowercase().as_str(), "ltr" | "rtl")
+                {
+                    msgs.push(VNuMessage::error(
+                        "The value of “dir” attribute for the “bdo” element must not be “auto”.",
+                        tag.line,
+                        tag.col,
+                    ));
+                }
+            } else {
+                msgs.push(VNuMessage::error(
+                    "Element “bdo” must have attribute “dir”.",
+                    tag.line,
+                    tag.col,
+                ));
+            }
+        }
+
+        if name_lower == "optgroup" {
+            if tag.has_attr("label") {
+                self.optgroup_missing_label.push(None);
+            } else {
+                self.optgroup_missing_label.push(Some((tag.line, tag.col)));
+            }
+        } else if name_lower == "legend"
+            && ctx
+                .parent()
+                .is_some_and(|p| p.name.eq_ignore_ascii_case("optgroup"))
+        {
+            if let Some(last) = self.optgroup_missing_label.last_mut() {
+                *last = None;
+            }
+        }
+
         if name_lower == "a" && ctx.is_descendant_of("button") {
             let msg = if tag.has_attr("href") {
                 "The element “a” with the attribute “href” must not appear as a descendant of the “button” element."
@@ -85,11 +177,28 @@ impl Rule for NestingRule {
         }
 
         if name_lower == "table" && ctx.is_descendant_of("table") {
-            msgs.push(VNuMessage::error(
-                "Start tag for “table” seen but the previous “table” is still open.",
-                tag.line,
-                tag.col,
-            ));
+            let in_cell = ctx
+                .open_elements
+                .iter()
+                .rev()
+                .find(|e| {
+                    matches!(
+                        e.name.to_ascii_lowercase().as_str(),
+                        "table" | "td" | "th" | "caption"
+                    )
+                })
+                .is_some_and(|e| {
+                    e.name.eq_ignore_ascii_case("td")
+                        || e.name.eq_ignore_ascii_case("th")
+                        || e.name.eq_ignore_ascii_case("caption")
+                });
+            if !in_cell {
+                msgs.push(VNuMessage::error(
+                    "Start tag for “table” seen but the previous “table” is still open.",
+                    tag.line,
+                    tag.col,
+                ));
+            }
         }
 
         if name_lower == "select"
@@ -139,6 +248,26 @@ impl Rule for NestingRule {
             ));
         }
 
+        msgs
+    }
+
+    fn on_end_tag(
+        &mut self,
+        _ctx: &ValidationContext,
+        name: &str,
+        _line: usize,
+        _col: usize,
+    ) -> Vec<VNuMessage> {
+        let mut msgs = Vec::new();
+        if name.eq_ignore_ascii_case("optgroup") {
+            if let Some(Some((line, col))) = self.optgroup_missing_label.pop() {
+                msgs.push(VNuMessage::error(
+                    "An “optgroup” element with no child “legend” element must have a “label” attribute.",
+                    line,
+                    col,
+                ));
+            }
+        }
         msgs
     }
 }

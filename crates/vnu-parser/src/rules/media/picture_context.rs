@@ -37,6 +37,7 @@ pub struct SourceInfo {
     pub has_media: bool,
     pub has_type: bool,
     pub sizes_starts_with_auto: bool,
+    pub has_w_without_sizes: bool,
     pub line: usize,
     pub col: usize,
 }
@@ -174,11 +175,16 @@ pub fn handle_picture_child(
             .get_attr("sizes")
             .map(|s| s.trim().to_ascii_lowercase().starts_with("auto"))
             .unwrap_or(false);
+        let has_w = tag
+            .get_attr("srcset")
+            .and_then(super::srcset_sizes::parse_srcset)
+            .is_some_and(|(w, _)| w);
 
         state.sources.push(SourceInfo {
             has_media: tag.has_attr("media"),
             has_type: tag.has_attr("type"),
             sizes_starts_with_auto: sizes_auto,
+            has_w_without_sizes: has_w && !tag.has_attr("sizes"),
             line: tag.line,
             col: tag.col,
         });
@@ -196,11 +202,20 @@ pub fn handle_picture_child(
                 .get_attr("sizes")
                 .map(|s| s.trim().to_ascii_lowercase().starts_with("auto"))
                 .unwrap_or(false);
+            let img_has_srcset = tag.has_attr("srcset");
+            let num_sources = state.sources.len();
 
-            for src in &state.sources {
-                if !src.has_media && !src.has_type {
+            for (i, src) in state.sources.iter().enumerate() {
+                if !src.has_media && !src.has_type && (i + 1 < num_sources || img_has_srcset) {
                     msgs.push(VNuMessage::error(
                         "A “source” element that has a following sibling “source” element or “img” element with a “srcset” attribute must have a “media” attribute and/or “type” attribute.",
+                        src.line,
+                        src.col,
+                    ));
+                }
+                if src.has_w_without_sizes && (!img_has_lazy || !img_sizes_auto) {
+                    msgs.push(VNuMessage::error(
+                        "When the “srcset” attribute has any image candidate string with a width descriptor, the “sizes” attribute must also be specified — unless the following “img” element has a “loading” attribute set to “lazy” and a “sizes” attribute value starting with “auto”.",
                         src.line,
                         src.col,
                     ));

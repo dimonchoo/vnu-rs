@@ -55,6 +55,12 @@ pub fn scan_syntax(src: &str, msgs: &mut Vec<VNuMessage>) {
 
         // 3. Markup start: '<'
         if b == b'<' {
+            if i + 9 <= len && &bytes[i..i + 9] == b"<![CDATA[" {
+                if let Some(end_cdata) = memchr::memmem::find(&bytes[i + 9..], b"]]>") {
+                    i += 9 + end_cdata + 3;
+                    continue;
+                }
+            }
             if i + 4 <= len && &bytes[i..i + 4] == b"<!--" {
                 let advanced = comments::handle_comment(
                     bytes,

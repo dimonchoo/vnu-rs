@@ -4,7 +4,7 @@ pub struct SourceLocation {
     pub col: usize,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct LineIndex {
     offsets: Vec<usize>,
     len: usize,
@@ -12,16 +12,22 @@ pub struct LineIndex {
 
 impl LineIndex {
     pub fn new(source: &str) -> Self {
-        let mut offsets = vec![0];
-        for (idx, b) in source.bytes().enumerate() {
-            if b == b'\n' {
-                offsets.push(idx + 1);
-            }
+        let mut idx = Self {
+            offsets: Vec::with_capacity((source.len() / 40).max(16)),
+            len: 0,
+        };
+        idx.reset(source);
+        idx
+    }
+
+    #[inline]
+    pub fn reset(&mut self, source: &str) {
+        self.offsets.clear();
+        self.offsets.push(0);
+        for pos in memchr::memchr_iter(b'\n', source.as_bytes()) {
+            self.offsets.push(pos + 1);
         }
-        Self {
-            offsets,
-            len: source.len(),
-        }
+        self.len = source.len();
     }
 
     pub fn line_offset(&self, line: usize) -> usize {
@@ -107,11 +113,15 @@ pub struct ValidationContext<'a> {
     pub head_seen: bool,
     pub title_seen: bool,
     pub body_seen: bool,
+    pub is_xhtml: bool,
     pub id_to_tag: std::collections::HashMap<String, String>,
+    pub line_index: Option<&'a LineIndex>,
 }
 
 impl<'a> ValidationContext<'a> {
     pub fn new(source: &'a str) -> Self {
+        let is_xhtml = source.trim_start().starts_with("<?xml")
+            || memchr::memmem::find(source.as_bytes(), b"http://www.w3.org/1999/xhtml").is_some();
         Self {
             source,
             mode: DocumentMode::Html,
@@ -121,7 +131,9 @@ impl<'a> ValidationContext<'a> {
             head_seen: false,
             title_seen: false,
             body_seen: false,
+            is_xhtml,
             id_to_tag: std::collections::HashMap::new(),
+            line_index: None,
         }
     }
 

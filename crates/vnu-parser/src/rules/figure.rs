@@ -40,6 +40,19 @@ impl Rule for FigureRule {
                 .is_some_and(|p| p.name.eq_ignore_ascii_case("figure"));
             if parent_is_figure {
                 if name_lower == "figcaption" {
+                    for ancestor in ctx.open_elements.iter().rev() {
+                        if ancestor.name.eq_ignore_ascii_case("figure")
+                            && ancestor.has_attr("role")
+                            && !ancestor.has_attr_val("role", "doc-example")
+                        {
+                            msgs.push(VNuMessage::error(
+                                "A “figure” element with a “figcaption” descendant must not have a “role” attribute.",
+                                tag.line,
+                                tag.col,
+                            ));
+                            break;
+                        }
+                    }
                     match *state {
                         FigureState::Initial => {
                             *state = FigureState::CaptionFirst;
@@ -71,6 +84,14 @@ impl Rule for FigureRule {
                     }
                 }
             }
+        }
+
+        if name_lower == "caption" && ctx.is_descendant_of("figure") {
+            msgs.push(VNuMessage::warning(
+                "When a “table” element is the only content in a “figure” element other than the “figcaption”, the “caption” element should be omitted in favor of the “figcaption”.",
+                tag.line,
+                tag.col,
+            ));
         }
 
         if name_lower == "figure" {

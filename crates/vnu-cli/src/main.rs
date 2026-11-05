@@ -6,6 +6,8 @@ use std::env;
 use std::fs;
 use std::io::{self, Read};
 use std::process;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::thread;
 use vnu_parser::ValidatorEngine;
 
 fn print_help() {
@@ -24,6 +26,63 @@ OPTIONS:
     -v, --version           Print version
 "#
     );
+}
+
+fn process_one_file(
+    engine: &mut ValidatorEngine,
+    file_path: &str,
+    is_json: bool,
+) -> (bool, Option<String>, Option<String>) {
+    let content = if file_path == "-" {
+        let mut buf = String::new();
+        if let Err(e) = io::stdin().read_to_string(&mut buf) {
+            return (true, None, Some(format!("Error reading stdin: {}", e)));
+        }
+        buf
+    } else {
+        match fs::read_to_string(file_path) {
+            Ok(c) => c,
+            Err(e) => {
+                return (
+                    true,
+                    None,
+                    Some(format!("Error reading {}: {}", file_path, e)),
+                );
+            }
+        }
+    };
+
+    if is_json {
+        match validate_content(engine, &content, true) {
+            Ok((report, json)) => (!report.is_valid(), Some(json), None),
+            Err(e) => (
+                true,
+                None,
+                Some(format!("Validation failure for {}: {}", file_path, e)),
+            ),
+        }
+    } else {
+        let report = engine.validate(&content);
+        let has_err = !report.is_valid();
+        let mut out = String::new();
+        if report.messages.is_empty() {
+            out.push_str(&format!("{}: The document is valid.", file_path));
+        } else {
+            for (i, m) in report.messages.into_iter().enumerate() {
+                if i > 0 {
+                    out.push('\n');
+                }
+                let loc = match (m.last_line, m.last_column) {
+                    (Some(l), Some(c)) => format!("{}:{}: ", l, c),
+                    (Some(l), None) => format!("{}: ", l),
+                    _ => String::new(),
+                };
+                let kind = format!("{:?}", m.msg_type).to_lowercase();
+                out.push_str(&format!("{}: {}{}: {}", file_path, loc, kind, m.message));
+            }
+        }
+        (has_err, Some(out), None)
+    }
 }
 
 fn main() {
@@ -63,60 +122,77 @@ fn main() {
         }
     }
 
-    let mut engine = ValidatorEngine::default();
     let mut has_errors = false;
 
-    for file_path in files {
-        let content = if file_path == "-" {
-            let mut buf = String::new();
-            if let Err(e) = io::stdin().read_to_string(&mut buf) {
-                eprintln!("Error reading stdin: {}", e);
+    if files.len() <= 1 || files.iter().any(|f| f == "-") {
+        let mut engine = ValidatorEngine::default();
+        for file_path in &files {
+            let (err, stdout_msg, stderr_msg) = process_one_file(&mut engine, file_path, is_json);
+            if err {
                 has_errors = true;
-                continue;
             }
-            buf
-        } else {
-            match fs::read_to_string(&file_path) {
-                Ok(c) => c,
-                Err(e) => {
-                    eprintln!("Error reading {}: {}", file_path, e);
-                    has_errors = true;
-                    continue;
-                }
+            if let Some(msg) = stderr_msg {
+                eprintln!("{}", msg);
             }
-        };
+            if let Some(msg) = stdout_msg {
+                println!("{}", msg);
+            }
+        }
+    } else {
+        let worker_count = thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(4)
+            .min(files.len());
+        let next_idx = AtomicUsize::new(0);
+        let files_ref = &files;
+        let next_idx_ref = &next_idx;
 
-        if is_json {
-            match validate_content(&mut engine, &content, true) {
-                Ok((report, json)) => {
-                    if !report.is_valid() {
-                        has_errors = true;
+        let (thread_results, worker_failed) = thread::scope(|s| {
+            let mut handles = Vec::with_capacity(worker_count);
+            for _ in 0..worker_count {
+                handles.push(s.spawn(move || {
+                    let mut engine = ValidatorEngine::default();
+                    let mut local_out = Vec::new();
+                    loop {
+                        let idx = next_idx_ref.fetch_add(1, Ordering::Relaxed);
+                        if idx >= files_ref.len() {
+                            break;
+                        }
+                        let res = process_one_file(&mut engine, &files_ref[idx], is_json);
+                        local_out.push((idx, res));
                     }
-                    println!("{}", json);
-                }
-                Err(e) => {
-                    eprintln!("Validation failure for {}: {}", file_path, e);
-                    has_errors = true;
+                    local_out
+                }));
+            }
+            let mut combined = Vec::with_capacity(files.len());
+            let mut failed = false;
+            for h in handles {
+                match h.join() {
+                    Ok(batch) => combined.extend(batch),
+                    Err(_) => {
+                        eprintln!("Error: CLI worker thread failed unexpectedly");
+                        failed = true;
+                    }
                 }
             }
-        } else {
-            let report = engine.validate(&content);
-            if !report.is_valid() {
+            (combined, failed)
+        });
+
+        if worker_failed {
+            has_errors = true;
+        }
+
+        let mut ordered = thread_results;
+        ordered.sort_unstable_by_key(|(idx, _)| *idx);
+        for (_, (err, stdout_msg, stderr_msg)) in ordered {
+            if err {
                 has_errors = true;
             }
-
-            if report.messages.is_empty() {
-                println!("{}: The document is valid.", file_path);
-            } else {
-                for m in report.messages {
-                    let loc = match (m.last_line, m.last_column) {
-                        (Some(l), Some(c)) => format!("{}:{}: ", l, c),
-                        (Some(l), None) => format!("{}: ", l),
-                        _ => String::new(),
-                    };
-                    let kind = format!("{:?}", m.msg_type).to_lowercase();
-                    println!("{}: {}{}: {}", file_path, loc, kind, m.message);
-                }
+            if let Some(msg) = stderr_msg {
+                eprintln!("{}", msg);
+            }
+            if let Some(msg) = stdout_msg {
+                println!("{}", msg);
             }
         }
     }
