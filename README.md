@@ -9,12 +9,13 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/dimonchoo/vnu-rs/actions/workflows/ci.yml"><img src="https://github.com/dimonchoo/vnu-rs/actions/workflows/ci.yml/badge.svg" alt="CI Status"/></a>
   <a href="https://github.com/dimonchoo/vnu-rs/actions"><img src="https://img.shields.io/badge/W3C%20Parity-100.00%25%20(5%2C824%2F5%2C824)-success?style=flat-square" alt="W3C Test Parity"/></a>
   <a href="#performance-and-resource-benchmarks"><img src="https://img.shields.io/badge/Memory%20RSS-1.95%20MB%20(~235x%20less)-blue?style=flat-square" alt="Memory RSS"/></a>
   <a href="#performance-and-resource-benchmarks"><img src="https://img.shields.io/badge/Audit%20Speed-5.4x--7.3x%20faster-orange?style=flat-square" alt="Speedup"/></a>
   <a href="#docker"><img src="https://img.shields.io/badge/Docker%20Image-11.5%20MB%20(Alpine)-blueviolet?style=flat-square" alt="Docker Image"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License: MIT"/></a>
-  <img src="https://img.shields.io/badge/JVM%20Dependency-0MB%20(Zero--JVM)-lightgrey?style=flat-square" alt="Zero JVM"/>
+  <img src="https://img.shields.io/badge/Cold%20Start-1--3%20ms-teal?style=flat-square" alt="Cold Start"/>
 </p>
 
 ---

@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  test-and-parity:
+    name: Test & W3C Parity
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run workspace tests
+        run: cargo test --workspace
+
+      - name: Fetch upstream W3C test fixtures
+        run: git clone --depth 1 https://github.com/validator/validator.git ../validator-upstream
+
+      - name: Run 100% Upstream W3C Parity Suite
+        run: VNU_UPSTREAM_TESTS=../validator-upstream/tests cargo run --release --bin eval_parity
+
+  docker:
+    name: Docker Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t vnu-rs:latest .

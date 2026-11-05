@@ -8,7 +8,16 @@ use std::io::{self, Read};
 use std::process;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
+use vnu_core::{MessageSubType, MessageType};
 use vnu_parser::ValidatorEngine;
+
+#[derive(Clone, Copy, PartialEq, Eq, Default)]
+enum OutputFormat {
+    #[default]
+    Text,
+    Gnu,
+    Json,
+}
 
 fn print_help() {
     println!(
@@ -20,10 +29,10 @@ USAGE:
     vnu --server [PORT] (starts HTTP daemon, default: 8889)
 
 OPTIONS:
-    --format <text|json>    Output format (default: json)
-    --server [PORT]         Run as an HTTP server matching v.Nu API
-    -h, --help              Print this help message
-    -v, --version           Print version
+    --format <text|gnu|json> Output format (default: text)
+    --server [PORT]          Run as an HTTP server matching v.Nu API
+    -h, --help               Print this help message
+    -v, --version            Print version
 "#
     );
 }
@@ -31,7 +40,7 @@ OPTIONS:
 fn process_one_file(
     engine: &mut ValidatorEngine,
     file_path: &str,
-    is_json: bool,
+    format: OutputFormat,
 ) -> (bool, Option<String>, Option<String>) {
     let content = if file_path == "-" {
         let mut buf = String::new();
@@ -52,36 +61,70 @@ fn process_one_file(
         }
     };
 
-    if is_json {
-        match validate_content(engine, &content, true) {
+    match format {
+        OutputFormat::Json => match validate_content(engine, &content, true) {
             Ok((report, json)) => (!report.is_valid(), Some(json), None),
             Err(e) => (
                 true,
                 None,
                 Some(format!("Validation failure for {}: {}", file_path, e)),
             ),
-        }
-    } else {
-        let report = engine.validate(&content);
-        let has_err = !report.is_valid();
-        let mut out = String::new();
-        if report.messages.is_empty() {
-            out.push_str(&format!("{}: The document is valid.", file_path));
-        } else {
+        },
+        OutputFormat::Gnu => {
+            let report = engine.validate(&content);
+            let has_err = !report.is_valid();
+            let mut out = String::new();
             for (i, m) in report.messages.into_iter().enumerate() {
                 if i > 0 {
                     out.push('\n');
                 }
                 let loc = match (m.last_line, m.last_column) {
-                    (Some(l), Some(c)) => format!("{}:{}: ", l, c),
+                    (Some(l), Some(c)) => format!("{}.{}: ", l, c),
                     (Some(l), None) => format!("{}: ", l),
                     _ => String::new(),
                 };
-                let kind = format!("{:?}", m.msg_type).to_lowercase();
-                out.push_str(&format!("{}: {}{}: {}", file_path, loc, kind, m.message));
+                let kind = match m.msg_type {
+                    MessageType::Info if m.sub_type == Some(MessageSubType::Warning) => "warning",
+                    MessageType::Info => "info",
+                    MessageType::Error => "error",
+                    MessageType::NonDocumentError => "fatal error",
+                };
+                out.push_str(&format!(
+                    "\"{}\": {}{}: {}",
+                    file_path, loc, kind, m.message
+                ));
             }
+            (has_err, Some(out), None)
         }
-        (has_err, Some(out), None)
+        OutputFormat::Text => {
+            let report = engine.validate(&content);
+            let has_err = !report.is_valid();
+            let mut out = String::new();
+            if report.messages.is_empty() {
+                out.push_str(&format!("{}: The document is valid.", file_path));
+            } else {
+                for (i, m) in report.messages.into_iter().enumerate() {
+                    if i > 0 {
+                        out.push('\n');
+                    }
+                    let loc = match (m.last_line, m.last_column) {
+                        (Some(l), Some(c)) => format!("{}:{}: ", l, c),
+                        (Some(l), None) => format!("{}: ", l),
+                        _ => String::new(),
+                    };
+                    let kind = match m.msg_type {
+                        MessageType::Info if m.sub_type == Some(MessageSubType::Warning) => {
+                            "warning"
+                        }
+                        MessageType::Info => "info",
+                        MessageType::Error => "error",
+                        MessageType::NonDocumentError => "error",
+                    };
+                    out.push_str(&format!("{}: {}{}: {}", file_path, loc, kind, m.message));
+                }
+            }
+            (has_err, Some(out), None)
+        }
     }
 }
 
@@ -106,15 +149,17 @@ fn main() {
         return;
     }
 
-    let mut is_json = true;
+    let mut format = OutputFormat::Text;
     let mut files = Vec::new();
 
     let mut iter = args.into_iter();
     while let Some(arg) = iter.next() {
         if arg == "--format" {
             if let Some(fmt) = iter.next() {
-                if fmt == "text" {
-                    is_json = false;
+                match fmt.to_lowercase().as_str() {
+                    "json" => format = OutputFormat::Json,
+                    "gnu" => format = OutputFormat::Gnu,
+                    _ => format = OutputFormat::Text,
                 }
             }
         } else if !arg.starts_with("--") {
@@ -127,7 +172,7 @@ fn main() {
     if files.len() <= 1 || files.iter().any(|f| f == "-") {
         let mut engine = ValidatorEngine::default();
         for file_path in &files {
-            let (err, stdout_msg, stderr_msg) = process_one_file(&mut engine, file_path, is_json);
+            let (err, stdout_msg, stderr_msg) = process_one_file(&mut engine, file_path, format);
             if err {
                 has_errors = true;
             }
@@ -158,7 +203,7 @@ fn main() {
                         if idx >= files_ref.len() {
                             break;
                         }
-                        let res = process_one_file(&mut engine, &files_ref[idx], is_json);
+                        let res = process_one_file(&mut engine, &files_ref[idx], format);
                         local_out.push((idx, res));
                     }
                     local_out
