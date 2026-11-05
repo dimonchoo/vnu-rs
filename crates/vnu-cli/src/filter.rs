@@ -63,3 +63,63 @@ pub fn filter_messages(
 
     (filtered, has_errors, has_warnings)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use vnu_core::{MessageSubType, MessageType, VNuMessage};
+
+    #[test]
+    fn errors_only_keeps_errors_and_drops_warnings_and_info() {
+        let messages = vec![
+            VNuMessage::error("bad", 1, 1),
+            VNuMessage::warning("careful", 1, 2),
+            VNuMessage::info("note", 1, 3),
+            VNuMessage::non_document_error("cannot read"),
+        ];
+        let cfg = MessageFilterConfig {
+            errors_only: true,
+            ..MessageFilterConfig::default()
+        };
+        let (filtered, has_errors, has_warnings) = filter_messages(messages, &cfg, None);
+        assert!(has_errors);
+        assert!(!has_warnings);
+        assert_eq!(filtered.len(), 2);
+        assert_eq!(filtered[0].msg_type, MessageType::Error);
+        assert_eq!(filtered[1].msg_type, MessageType::NonDocumentError);
+    }
+
+    #[test]
+    fn skip_info_keeps_warnings() {
+        let messages = vec![
+            VNuMessage::warning("careful", 1, 2),
+            VNuMessage::info("note", 1, 3),
+        ];
+        let cfg = MessageFilterConfig {
+            skip_info_messages: true,
+            ..MessageFilterConfig::default()
+        };
+        let (filtered, has_errors, has_warnings) = filter_messages(messages, &cfg, None);
+        assert!(!has_errors);
+        assert!(has_warnings);
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].sub_type, Some(MessageSubType::Warning));
+    }
+
+    #[test]
+    fn asciiquotes_and_filter_pattern_suppress_matches() {
+        let messages = vec![
+            VNuMessage::error("Expected “doctype”", 1, 1),
+            VNuMessage::error("unrelated", 2, 1),
+        ];
+        let cfg = MessageFilterConfig {
+            asciiquotes: true,
+            ..MessageFilterConfig::default()
+        };
+        let pattern = Regex::new("unrelated").expect("regex");
+        let (filtered, has_errors, _) = filter_messages(messages, &cfg, Some(&pattern));
+        assert!(has_errors);
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].message, "Expected \"doctype\"");
+    }
+}

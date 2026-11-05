@@ -67,8 +67,11 @@ impl Rule for HtmlLangRule {
         msgs
     }
 
-    fn on_finish(&mut self, _ctx: &ValidationContext) -> Vec<VNuMessage> {
+    fn on_finish(&mut self, ctx: &ValidationContext) -> Vec<VNuMessage> {
         let mut msgs = Vec::new();
+        if ctx.mode == crate::context::DocumentMode::Svg {
+            return msgs;
+        }
         if !self.html_lang_seen && !self.warning_emitted {
             msgs.push(VNuMessage::warning(
                 "Consider adding a “lang” attribute to the “html” start tag to declare the language of this document.",

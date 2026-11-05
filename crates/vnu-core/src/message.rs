@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum MessageType {
     Error,
@@ -9,7 +9,7 @@ pub enum MessageType {
     NonDocumentError,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum MessageSubType {
     Warning,
@@ -23,6 +23,8 @@ pub enum MessageSubType {
 pub struct VNuMessage {
     #[serde(rename = "type")]
     pub msg_type: MessageType,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sub_type: Option<MessageSubType>,
     pub message: String,
@@ -46,6 +48,7 @@ impl VNuMessage {
     pub fn error(message: impl Into<String>, line: usize, col: usize) -> Self {
         Self {
             msg_type: MessageType::Error,
+            url: None,
             sub_type: None,
             message: message.into(),
             extract: None,
@@ -61,6 +64,7 @@ impl VNuMessage {
     pub fn warning(message: impl Into<String>, line: usize, col: usize) -> Self {
         Self {
             msg_type: MessageType::Info,
+            url: None,
             sub_type: Some(MessageSubType::Warning),
             message: message.into(),
             extract: None,
@@ -76,6 +80,7 @@ impl VNuMessage {
     pub fn info(message: impl Into<String>, line: usize, col: usize) -> Self {
         Self {
             msg_type: MessageType::Info,
+            url: None,
             sub_type: None,
             message: message.into(),
             extract: None,
@@ -86,6 +91,27 @@ impl VNuMessage {
             hilite_start: None,
             hilite_length: None,
         }
+    }
+
+    pub fn non_document_error(message: impl Into<String>) -> Self {
+        Self {
+            msg_type: MessageType::NonDocumentError,
+            url: None,
+            sub_type: None,
+            message: message.into(),
+            extract: None,
+            last_line: None,
+            first_line: None,
+            last_column: None,
+            first_column: None,
+            hilite_start: None,
+            hilite_length: None,
+        }
+    }
+
+    pub fn with_url(mut self, url: impl Into<String>) -> Self {
+        self.url = Some(url.into());
+        self
     }
 }
 
@@ -174,5 +200,17 @@ mod tests {
         assert_eq!(report.error_count(), 1);
         assert_eq!(report.warning_count(), 1);
         assert!(!report.is_valid());
+    }
+
+    #[test]
+    fn url_is_omitted_when_absent_and_emitted_when_set() {
+        let message = VNuMessage::error("boom", 1, 2);
+        let json = serde_json::to_value(&message).expect("serialize");
+        assert!(json.get("url").is_none());
+
+        let tagged = message.with_url("file:/tmp/a.html");
+        let json = serde_json::to_value(&tagged).expect("serialize");
+        assert_eq!(json["url"], "file:/tmp/a.html");
+        assert_eq!(json["type"], "error");
     }
 }

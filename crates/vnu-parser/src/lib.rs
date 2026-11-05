@@ -1,12 +1,13 @@
 pub mod context;
 pub mod engine;
+pub mod quotes;
 pub mod rule;
 pub mod rules;
 pub mod schema;
 pub mod syntax;
 
 pub use context::{ElementContext, LineIndex, SourceLocation, ValidationContext};
-pub use engine::ValidatorEngine;
+pub use engine::{CheckMode, ValidatorEngine};
 pub use rule::Rule;
 
 #[cfg(test)]

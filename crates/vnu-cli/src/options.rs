@@ -15,6 +15,10 @@ pub struct CliOptions {
     pub skip_non_html: bool,
     pub skip_non_svg: bool,
     pub skip_non_css: bool,
+    pub force_css: bool,
+    pub force_svg: bool,
+    pub also_check_css: bool,
+    pub also_check_svg: bool,
     pub verbose: bool,
     pub server_port: Option<u16>,
     pub filter_patterns: Vec<String>,
@@ -86,7 +90,7 @@ OPTIONS
         smart quotation marks in messages.
 
     --no-langdetect
-        Disables language detection and html[lang] checking.
+        Disables language detection. html[lang] conformance checks still run.
 
     --format gnu|xml|json|text
         Specifies output format for reporting results (default: "gnu").
@@ -98,13 +102,25 @@ OPTIONS
         Specifies a file containing regular expressions (one per line) to filter out.
 
     --skip-non-html
-        Skip documents that don’t have *.html, *.htm, *.xhtml, or *.xht extensions.
+        Skip files that do not have .html, .htm, .xhtml, or .xht extensions.
 
     --skip-non-svg
-        Check documents as SVG but skip documents that don’t have *.svg extensions.
+        Check only files that have a .svg extension, using the SVG document rules.
 
     --skip-non-css
-        Check documents as CSS but skip documents that don’t have *.css extensions.
+        Check only files that have a .css extension, using the CSS checker.
+
+    --css
+        Check every input as CSS. Takes priority over the SVG options.
+
+    --svg
+        Check every input as SVG.
+
+    --also-check-css
+        Check .css files with the CSS checker. Other files are still checked as HTML.
+
+    --also-check-svg
+        Check .svg files with the SVG document rules. Other files are still checked as HTML.
 
     --server [PORT]
         Run as an HTTP server matching the official v.Nu API (default port: 8888).
@@ -137,6 +153,10 @@ pub fn parse_args(args: &[String]) -> Result<CliOptions, String> {
             "--skip-non-html" => opts.skip_non_html = true,
             "--skip-non-svg" => opts.skip_non_svg = true,
             "--skip-non-css" => opts.skip_non_css = true,
+            "--css" => opts.force_css = true,
+            "--svg" => opts.force_svg = true,
+            "--also-check-css" => opts.also_check_css = true,
+            "--also-check-svg" => opts.also_check_svg = true,
             "--verbose" => opts.verbose = true,
             "--format" => {
                 if let Some(fmt) = iter.next() {
@@ -166,11 +186,17 @@ pub fn parse_args(args: &[String]) -> Result<CliOptions, String> {
                 }
             }
             "--server" => {
-                let port = iter
-                    .clone()
-                    .next()
-                    .and_then(|p| p.parse::<u16>().ok())
-                    .unwrap_or(8888);
+                let port = match iter.clone().next() {
+                    Some(next) if !next.starts_with('-') => {
+                        if let Ok(port) = next.parse::<u16>() {
+                            iter.next();
+                            port
+                        } else {
+                            8888
+                        }
+                    }
+                    _ => 8888,
+                };
                 opts.server_port = Some(port);
             }
             file if !file.starts_with("--") => {
@@ -183,4 +209,36 @@ pub fn parse_args(args: &[String]) -> Result<CliOptions, String> {
     }
 
     Ok(opts)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::format::OutputFormat;
+
+    #[test]
+    fn rejects_unknown_format_and_missing_filter_pattern() {
+        let missing = parse_args(&["--format".to_string()]);
+        assert!(missing.is_err());
+
+        let unknown = parse_args(&["--format".to_string(), "html".to_string()]);
+        assert!(unknown.unwrap_err().contains("Unknown output format"));
+
+        let no_pattern = parse_args(&["--filterpattern".to_string()]);
+        assert!(no_pattern.is_err());
+    }
+
+    #[test]
+    fn format_and_files_are_parsed() {
+        let opts = parse_args(&[
+            "--format".to_string(),
+            "JSON".to_string(),
+            "index.html".to_string(),
+            "--Werror".to_string(),
+        ])
+        .expect("parse");
+        assert_eq!(opts.format, OutputFormat::Json);
+        assert!(opts.werror);
+        assert_eq!(opts.files, vec!["index.html".to_string()]);
+    }
 }

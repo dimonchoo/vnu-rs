@@ -17,6 +17,8 @@ pub struct StreamingValidator<'a> {
     pub first_tag_seen: bool,
     pub line_index: &'a LineIndex,
     pub normalizer: super::attribute_normalization::XhtmlAttributeNormalizer,
+    tag_cursor_line: usize,
+    tag_cursor_byte: usize,
 }
 
 impl<'a> StreamingValidator<'a> {
@@ -41,10 +43,43 @@ impl<'a> StreamingValidator<'a> {
             first_tag_seen: false,
             line_index,
             normalizer,
+            tag_cursor_line: 0,
+            tag_cursor_byte: 0,
         }
     }
 
-    pub fn on_doctype(&mut self, d: Doctype, line: usize) {
+    pub fn column_for_tag(&mut self, line: usize, name: &str, end_tag: bool) -> usize {
+        self.column_from_line(line, |snippet, from| {
+            super::tag_column::find_tag(snippet, from, name, end_tag)
+        })
+    }
+
+    pub fn column_for_marker(&mut self, line: usize, marker: &str) -> usize {
+        self.column_from_line(line, |snippet, from| {
+            super::tag_column::find_marker(snippet, from, marker)
+        })
+    }
+
+    fn column_from_line(
+        &mut self,
+        line: usize,
+        find: impl FnOnce(&str, usize) -> Option<(usize, usize)>,
+    ) -> usize {
+        if self.tag_cursor_line != line {
+            self.tag_cursor_line = line;
+            self.tag_cursor_byte = 0;
+        }
+        let snippet = self.line_index.line_snippet(self.ctx.source, line);
+        match find(snippet, self.tag_cursor_byte) {
+            Some((col, next)) => {
+                self.tag_cursor_byte = next;
+                col
+            }
+            None => 1,
+        }
+    }
+
+    pub fn on_doctype(&mut self, d: Doctype, line: usize, col: usize) {
         self.scan_policy
             .tracker
             .on_doctype(&d, self.ctx.doctype_seen);
@@ -52,7 +87,7 @@ impl<'a> StreamingValidator<'a> {
         let name = d.name.as_deref().unwrap_or("");
         for rule in &mut self.rules {
             self.messages
-                .extend(rule.on_doctype(&self.ctx, name, line, 1));
+                .extend(rule.on_doctype(&self.ctx, name, line, col));
         }
     }
 
@@ -96,6 +131,7 @@ impl<'a> StreamingValidator<'a> {
                 if !elem.has_attr("xmlns") {
                     self.messages.push(VNuMessage {
                         msg_type: MessageType::NonDocumentError,
+                        url: None,
                         sub_type: Some(MessageSubType::Schema),
                         message: "XML document with no namespace; cannot determine any schema to use for validation.".into(),
                         extract: None,
@@ -109,6 +145,7 @@ impl<'a> StreamingValidator<'a> {
                 } else {
                     self.messages.push(VNuMessage {
                         msg_type: MessageType::Info,
+                        url: None,
                         sub_type: None,
                         message: "Using the preset for SVG + URL + HTML + MathML based on the root namespace.".into(),
                         extract: None,

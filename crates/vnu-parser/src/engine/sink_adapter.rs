@@ -44,7 +44,9 @@ impl<'a> TokenSink for StreamingSink<'a> {
         let line = line_number as usize;
         match token {
             Token::DoctypeToken(d) => {
-                self.inner.borrow_mut().on_doctype(d, line);
+                let mut inner = self.inner.borrow_mut();
+                let col = inner.column_for_marker(line, "<!");
+                inner.on_doctype(d, line, col);
             }
             Token::TagToken(tag) => match tag.kind {
                 TagKind::StartTag => {
@@ -55,13 +57,14 @@ impl<'a> TokenSink for StreamingSink<'a> {
                         .collect();
 
                     let mut inner = self.inner.borrow_mut();
+                    let col = inner.column_for_tag(line, tag.name.as_ref(), false);
                     inner.normalizer.normalize_attributes(line, &mut attrs);
-                    inner.on_start_tag(tag.name.to_string(), attrs, tag.self_closing, line, 1);
+                    inner.on_start_tag(tag.name.to_string(), attrs, tag.self_closing, line, col);
                 }
                 TagKind::EndTag => {
-                    self.inner
-                        .borrow_mut()
-                        .on_end_tag(tag.name.as_ref(), line, 1);
+                    let mut inner = self.inner.borrow_mut();
+                    let col = inner.column_for_tag(line, tag.name.as_ref(), true);
+                    inner.on_end_tag(tag.name.as_ref(), line, col);
                 }
             },
             Token::CharacterTokens(text) => {

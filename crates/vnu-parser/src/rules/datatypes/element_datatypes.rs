@@ -135,6 +135,7 @@ pub fn validate_element_datatypes(tag: &ElementContext, el: &str, msgs: &mut Vec
                     } else if charset_part.eq_ignore_ascii_case("not-a-charset") {
                         msgs.push(VNuMessage {
                             msg_type: MessageType::Error,
+                            url: None,
                             sub_type: Some(MessageSubType::Fatal),
                             message: format!(
                                 "Internal encoding declaration named an unsupported chararacter encoding “{}”.",
