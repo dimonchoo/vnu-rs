@@ -9,7 +9,7 @@ use self::dispatch::StreamingValidator;
 use self::sink_adapter::StreamingSink;
 use crate::context::LineIndex;
 use crate::rule::Rule;
-use crate::rules::default_rules;
+use crate::rules::{default_rules, rules_with_options};
 use html5ever::tokenizer::{BufferQueue, Tokenizer, TokenizerOpts, TokenizerResult};
 use std::cell::RefCell;
 use vnu_core::VNuReport;
@@ -28,6 +28,10 @@ impl Default for ValidatorEngine {
 }
 
 impl ValidatorEngine {
+    pub fn with_options(enable_langdetect: bool) -> Self {
+        Self::new(rules_with_options(enable_langdetect))
+    }
+
     pub fn new(rules: Vec<Box<dyn Rule>>) -> Self {
         let char_rule_indices = rules
             .iter()

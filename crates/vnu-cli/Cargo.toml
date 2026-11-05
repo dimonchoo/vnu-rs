@@ -18,3 +18,4 @@ vnu-core = { path = "../vnu-core" }
 vnu-parser = { path = "../vnu-parser" }
 serde.workspace = true
 serde_json.workspace = true
+regex.workspace = true

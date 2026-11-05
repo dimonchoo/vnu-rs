@@ -1,51 +1,67 @@
+mod filter;
+mod format;
+mod formatter;
+mod options;
 mod server;
 mod service;
 
-use service::validate_content;
+use filter::{MessageFilterConfig, filter_messages};
+use format::OutputFormat;
+use formatter::format_report;
+use options::{CliOptions, parse_args, print_help};
+use regex::Regex;
 use std::env;
 use std::fs;
-use std::io::{self, Read};
+use std::io::{self, Read, Write};
 use std::process;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
-use vnu_core::{MessageSubType, MessageType};
 use vnu_parser::ValidatorEngine;
 
-#[derive(Clone, Copy, PartialEq, Eq, Default)]
-enum OutputFormat {
-    #[default]
-    Text,
-    Gnu,
-    Json,
-}
-
-fn print_help() {
-    println!(
-        r#"vnu-rs: Native ultra-fast W3C HTML5 validator
-
-USAGE:
-    vnu [OPTIONS] <FILE>...
-    vnu - (reads from stdin)
-    vnu --server [PORT] (starts HTTP daemon, default: 8889)
-
-OPTIONS:
-    --format <text|gnu|json> Output format (default: text)
-    --server [PORT]          Run as an HTTP server matching v.Nu API
-    -h, --help               Print this help message
-    -v, --version            Print version
-"#
-    );
+fn should_skip_file(file_path: &str, opts: &CliOptions) -> bool {
+    if file_path == "-" {
+        return false;
+    }
+    let lower = file_path.to_ascii_lowercase();
+    if opts.skip_non_html {
+        return !(lower.ends_with(".html")
+            || lower.ends_with(".htm")
+            || lower.ends_with(".xhtml")
+            || lower.ends_with(".xht"));
+    }
+    if opts.skip_non_svg {
+        return !lower.ends_with(".svg");
+    }
+    if opts.skip_non_css {
+        return !lower.ends_with(".css");
+    }
+    false
 }
 
 fn process_one_file(
     engine: &mut ValidatorEngine,
     file_path: &str,
-    format: OutputFormat,
-) -> (bool, Option<String>, Option<String>) {
+    opts: &CliOptions,
+    filter_cfg: &MessageFilterConfig,
+    filter_re: Option<&Regex>,
+) -> (bool, bool, Option<String>, Option<String>) {
+    if should_skip_file(file_path, opts) {
+        return (false, false, None, None);
+    }
+
+    if opts.verbose {
+        eprintln!("Checking {}", file_path);
+    }
+
     let content = if file_path == "-" {
         let mut buf = String::new();
         if let Err(e) = io::stdin().read_to_string(&mut buf) {
-            return (true, None, Some(format!("Error reading stdin: {}", e)));
+            return (
+                true,
+                false,
+                None,
+                Some(format!("Error reading stdin: {}", e)),
+            );
         }
         buf
     } else {
@@ -54,6 +70,7 @@ fn process_one_file(
             Err(e) => {
                 return (
                     true,
+                    false,
                     None,
                     Some(format!("Error reading {}: {}", file_path, e)),
                 );
@@ -61,70 +78,22 @@ fn process_one_file(
         }
     };
 
-    match format {
-        OutputFormat::Json => match validate_content(engine, &content, true) {
-            Ok((report, json)) => (!report.is_valid(), Some(json), None),
-            Err(e) => (
-                true,
-                None,
-                Some(format!("Validation failure for {}: {}", file_path, e)),
-            ),
-        },
-        OutputFormat::Gnu => {
-            let report = engine.validate(&content);
-            let has_err = !report.is_valid();
-            let mut out = String::new();
-            for (i, m) in report.messages.into_iter().enumerate() {
-                if i > 0 {
-                    out.push('\n');
-                }
-                let loc = match (m.last_line, m.last_column) {
-                    (Some(l), Some(c)) => format!("{}.{}: ", l, c),
-                    (Some(l), None) => format!("{}: ", l),
-                    _ => String::new(),
-                };
-                let kind = match m.msg_type {
-                    MessageType::Info if m.sub_type == Some(MessageSubType::Warning) => "warning",
-                    MessageType::Info => "info",
-                    MessageType::Error => "error",
-                    MessageType::NonDocumentError => "fatal error",
-                };
-                out.push_str(&format!(
-                    "\"{}\": {}{}: {}",
-                    file_path, loc, kind, m.message
-                ));
-            }
-            (has_err, Some(out), None)
-        }
-        OutputFormat::Text => {
-            let report = engine.validate(&content);
-            let has_err = !report.is_valid();
-            let mut out = String::new();
-            if report.messages.is_empty() {
-                out.push_str(&format!("{}: The document is valid.", file_path));
-            } else {
-                for (i, m) in report.messages.into_iter().enumerate() {
-                    if i > 0 {
-                        out.push('\n');
-                    }
-                    let loc = match (m.last_line, m.last_column) {
-                        (Some(l), Some(c)) => format!("{}:{}: ", l, c),
-                        (Some(l), None) => format!("{}: ", l),
-                        _ => String::new(),
-                    };
-                    let kind = match m.msg_type {
-                        MessageType::Info if m.sub_type == Some(MessageSubType::Warning) => {
-                            "warning"
-                        }
-                        MessageType::Info => "info",
-                        MessageType::Error => "error",
-                        MessageType::NonDocumentError => "error",
-                    };
-                    out.push_str(&format!("{}: {}{}: {}", file_path, loc, kind, m.message));
-                }
-            }
-            (has_err, Some(out), None)
-        }
+    let report = engine.validate(&content);
+    let (filtered, has_errors, has_warnings) = if filter_cfg.is_noop() && filter_re.is_none() {
+        let has_err = !report.is_valid();
+        let has_warn = report.warning_count() > 0;
+        (report.messages, has_err, has_warn)
+    } else {
+        filter_messages(report.messages, filter_cfg, filter_re)
+    };
+
+    if filtered.is_empty() && opts.format != OutputFormat::Text {
+        return (has_errors, has_warnings, None, None);
+    }
+
+    match format_report(file_path, filtered, opts.format) {
+        Ok(formatted) => (has_errors, has_warnings, Some(formatted), None),
+        Err(err) => (true, has_warnings, None, Some(err)),
     }
 }
 
@@ -140,76 +109,112 @@ fn main() {
         return;
     }
 
-    if let Some(pos) = args.iter().position(|a| a == "--server") {
-        let port = args
-            .get(pos + 1)
-            .and_then(|p| p.parse::<u16>().ok())
-            .unwrap_or(8889);
+    let mut opts = match parse_args(&args) {
+        Ok(o) => o,
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            eprintln!("Run 'vnu --help' for usage details.");
+            process::exit(1);
+        }
+    };
+
+    if let Some(port) = opts.server_port {
         server::run_server(port);
         return;
     }
 
-    let mut format = OutputFormat::Text;
-    let mut files = Vec::new();
-
-    let mut iter = args.into_iter();
-    while let Some(arg) = iter.next() {
-        if arg == "--format" {
-            if let Some(fmt) = iter.next() {
-                match fmt.to_lowercase().as_str() {
-                    "json" => format = OutputFormat::Json,
-                    "gnu" => format = OutputFormat::Gnu,
-                    _ => format = OutputFormat::Text,
-                }
-            }
-        } else if !arg.starts_with("--") {
-            files.push(arg);
-        }
+    if let Err(e) = opts.load_filter_files() {
+        eprintln!("Error: {}", e);
+        process::exit(1);
     }
 
-    let mut has_errors = false;
+    if opts.files.is_empty() {
+        eprintln!("Error: No input files specified. Use '-' to read from standard input.");
+        eprintln!("Run 'vnu --help' for usage details.");
+        process::exit(1);
+    }
 
-    if files.len() <= 1 || files.iter().any(|f| f == "-") {
-        let mut engine = ValidatorEngine::default();
-        for file_path in &files {
-            let (err, stdout_msg, stderr_msg) = process_one_file(&mut engine, file_path, format);
+    let filter_re = match opts.build_filter_regex() {
+        Ok(re) => re,
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            process::exit(1);
+        }
+    };
+    let filter_re_ref = filter_re.as_ref();
+
+    let filter_cfg = MessageFilterConfig {
+        errors_only: opts.errors_only,
+        skip_info_messages: opts.skip_info_messages,
+        asciiquotes: opts.asciiquotes,
+    };
+    let filter_cfg_ref = &filter_cfg;
+
+    let mut has_errors = false;
+    let mut has_warnings = false;
+
+    let write_output = |stdout_msg: Option<String>, stderr_msg: Option<String>| {
+        if let Some(msg) = stderr_msg {
+            eprintln!("{}", msg);
+        }
+        if let Some(msg) = stdout_msg {
+            if opts.stdout {
+                println!("{}", msg);
+            } else {
+                eprintln!("{}", msg);
+            }
+        }
+    };
+
+    let enable_langdetect = !opts.no_langdetect;
+
+    if opts.files.len() <= 1 || opts.files.iter().any(|f| f == "-") {
+        let mut engine = ValidatorEngine::with_options(enable_langdetect);
+        for file_path in &opts.files {
+            let (err, warn, stdout_msg, stderr_msg) =
+                process_one_file(&mut engine, file_path, &opts, filter_cfg_ref, filter_re_ref);
             if err {
                 has_errors = true;
             }
-            if let Some(msg) = stderr_msg {
-                eprintln!("{}", msg);
+            if warn {
+                has_warnings = true;
             }
-            if let Some(msg) = stdout_msg {
-                println!("{}", msg);
-            }
+            write_output(stdout_msg, stderr_msg);
         }
     } else {
         let worker_count = thread::available_parallelism()
             .map(|n| n.get())
             .unwrap_or(4)
-            .min(files.len());
+            .min(opts.files.len());
         let next_idx = AtomicUsize::new(0);
-        let files_ref = &files;
+        let files_ref = &opts.files;
         let next_idx_ref = &next_idx;
+        let opts_ref = &opts;
 
         let (thread_results, worker_failed) = thread::scope(|s| {
             let mut handles = Vec::with_capacity(worker_count);
             for _ in 0..worker_count {
                 handles.push(s.spawn(move || {
-                    let mut engine = ValidatorEngine::default();
+                    let mut engine = ValidatorEngine::with_options(enable_langdetect);
                     let mut local_out = Vec::new();
                     loop {
                         let idx = next_idx_ref.fetch_add(1, Ordering::Relaxed);
                         if idx >= files_ref.len() {
                             break;
                         }
-                        let res = process_one_file(&mut engine, &files_ref[idx], format);
+                        let res = process_one_file(
+                            &mut engine,
+                            &files_ref[idx],
+                            opts_ref,
+                            filter_cfg_ref,
+                            filter_re_ref,
+                        );
                         local_out.push((idx, res));
                     }
                     local_out
                 }));
             }
-            let mut combined = Vec::with_capacity(files.len());
+            let mut combined = Vec::with_capacity(opts.files.len());
             let mut failed = false;
             for h in handles {
                 match h.join() {
@@ -229,20 +234,29 @@ fn main() {
 
         let mut ordered = thread_results;
         ordered.sort_unstable_by_key(|(idx, _)| *idx);
-        for (_, (err, stdout_msg, stderr_msg)) in ordered {
+        for (_, (err, warn, stdout_msg, stderr_msg)) in ordered {
             if err {
                 has_errors = true;
             }
-            if let Some(msg) = stderr_msg {
-                eprintln!("{}", msg);
+            if warn {
+                has_warnings = true;
             }
-            if let Some(msg) = stdout_msg {
-                println!("{}", msg);
-            }
+            write_output(stdout_msg, stderr_msg);
         }
     }
 
-    if has_errors {
+    if let Err(e) = io::stdout().flush() {
+        eprintln!("Warning: Failed to flush stdout: {}", e);
+    }
+    if let Err(e) = io::stderr().flush() {
+        eprintln!("Warning: Failed to flush stderr: {}", e);
+    }
+
+    if opts.exit_zero_always {
+        process::exit(0);
+    }
+
+    if has_errors || (opts.werror && has_warnings) {
         process::exit(1);
     }
 }

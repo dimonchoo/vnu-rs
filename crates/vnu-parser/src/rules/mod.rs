@@ -48,10 +48,16 @@ pub use tables::TablesRule;
 use crate::rule::Rule;
 
 pub fn default_rules() -> Vec<Box<dyn Rule>> {
-    vec![
-        Box::new(DoctypeRule::default()),
-        Box::new(HtmlLangRule::default()),
-        Box::new(HeadTitleRule::default()),
+    rules_with_options(true)
+}
+
+pub fn rules_with_options(enable_langdetect: bool) -> Vec<Box<dyn Rule>> {
+    let mut rules: Vec<Box<dyn Rule>> = vec![Box::new(DoctypeRule::default())];
+    if enable_langdetect {
+        rules.push(Box::new(HtmlLangRule::default()));
+    }
+    rules.extend(vec![
+        Box::new(HeadTitleRule::default()) as Box<dyn Rule>,
         Box::new(ImgAltRule),
         Box::new(HyperlinksRule),
         Box::new(NestingRule::default()),
@@ -82,7 +88,10 @@ pub fn default_rules() -> Vec<Box<dyn Rule>> {
         Box::new(ForeignSvgRule::default()),
         Box::new(RdfaRule),
         Box::new(CspRule::default()),
-        Box::new(LangDetectRule::default()),
-        Box::new(XmlStylesheetRule),
-    ]
+    ]);
+    if enable_langdetect {
+        rules.push(Box::new(LangDetectRule::default()));
+    }
+    rules.push(Box::new(XmlStylesheetRule));
+    rules
 }
