@@ -125,6 +125,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[ignore = "requires running Java v.Nu daemon on :8888"]
     fn test_differential_oracle_comparison() {
         let harness = OracleHarness::default();
         let test_html = "<!DOCTYPE html><html lang=\"en\"><head><title>Test</title></head><body><p>Hello</p></body></html>";
@@ -143,6 +144,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires running Java v.Nu daemon on :8888"]
     fn test_invalid_snippet_differential() {
         let harness = OracleHarness::default();
         let test_html = "<html><body><img src='test.png'><a href='#'><a>nested</a></a></div>";
@@ -169,6 +171,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires running Java v.Nu daemon on :8888"]
     fn test_obsolete_and_forms_differential() {
         let harness = OracleHarness::default();
         let test_html = "<!DOCTYPE html><html lang='en'><head><title>T</title></head><body><form><form></form></form><center>old</center><font color='red'>text</font><div align='center'>d</div></body></html>";
@@ -193,6 +196,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires running Java v.Nu daemon on :8888"]
     fn test_aria_differential() {
         let harness = OracleHarness::default();
         let test_html = "<!DOCTYPE html><html lang='en'><head><title>T</title></head><body><div role='invalid_role'>div</div><div aria-fake='test'>div</div></body></html>";
@@ -220,6 +224,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires running Java v.Nu daemon on :8888"]
     fn test_metadata_differential() {
         let harness = OracleHarness::default();
         let test_html = "<!DOCTYPE html><html lang='en'><head><title>T</title><base href='/'><base href='/2'><meta charset='latin1'><link rel='stylesheet'></head><body><svg><path d='M0 0'></svg></body></html>";
@@ -245,6 +250,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires running Java v.Nu daemon on :8888"]
     fn test_svg_differential() {
         let harness = OracleHarness::default();
         let valid_svg = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='40'/></svg>";
