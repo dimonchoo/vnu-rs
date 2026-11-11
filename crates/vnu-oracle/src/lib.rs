@@ -20,9 +20,15 @@ pub struct OracleHarness {
     client: reqwest::blocking::Client,
 }
 
+/// Java v.Nu endpoint. :8888 now runs vnu-rs itself, so the oracle defaults to :8899
+/// (`make oracle-up`) and can be overridden with VNU_ORACLE_URL.
+pub fn oracle_endpoint() -> String {
+    std::env::var("VNU_ORACLE_URL").unwrap_or_else(|_| "http://127.0.0.1:8899/?out=json".into())
+}
+
 impl Default for OracleHarness {
     fn default() -> Self {
-        Self::new("http://127.0.0.1:8888/?out=json")
+        Self::new(oracle_endpoint())
     }
 }
 
@@ -65,47 +71,25 @@ impl OracleHarness {
         let mut engine = ValidatorEngine::default();
         let local_report = engine.validate(html);
 
-        let local_set: HashSet<&str> = local_report
-            .messages
-            .iter()
-            .map(|m| m.message.as_str())
-            .collect();
-
-        let mut matched = Vec::new();
-        let mut missing = Vec::new();
-
-        for o_msg in &oracle_report.messages {
-            let o_str = o_msg.message.as_str();
-            if local_set.contains(o_str)
-                || local_report
-                    .messages
-                    .iter()
-                    .any(|l| l.message.contains(o_str) || o_str.contains(&l.message))
-            {
-                matched.push(o_msg.message.clone());
-            } else {
-                missing.push(o_msg.message.clone());
-            }
-        }
-
-        let oracle_set: HashSet<&str> = oracle_report
-            .messages
-            .iter()
-            .map(|m| m.message.as_str())
-            .collect();
-
-        let mut extra = Vec::new();
-        for l_msg in &local_report.messages {
-            let l_str = l_msg.message.as_str();
-            if !oracle_set.contains(l_str)
-                && !oracle_report
-                    .messages
-                    .iter()
-                    .any(|o| o.message.contains(l_str) || l_str.contains(&o.message))
-            {
-                extra.push(l_msg.message.clone());
-            }
-        }
+        // Exact message comparison over errors and warnings (infos are advisory).
+        let reportable = |r: &VNuReport| -> HashSet<String> {
+            r.messages
+                .iter()
+                .filter(|m| {
+                    m.msg_type != vnu_core::MessageType::Info
+                        || m.sub_type == Some(vnu_core::MessageSubType::Warning)
+                })
+                .map(|m| m.message.clone())
+                .collect()
+        };
+        let oracle_set = reportable(&oracle_report);
+        let local_set = reportable(&local_report);
+        let mut matched: Vec<String> = oracle_set.intersection(&local_set).cloned().collect();
+        let mut missing: Vec<String> = oracle_set.difference(&local_set).cloned().collect();
+        let mut extra: Vec<String> = local_set.difference(&oracle_set).cloned().collect();
+        matched.sort();
+        missing.sort();
+        extra.sort();
 
         Ok(DiffVerdict {
             html_snippet: html.to_string(),

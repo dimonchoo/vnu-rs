@@ -1,4 +1,4 @@
-.PHONY: all build check test parity fmt docker-build docker-run docker-stop audit-site oracle help fetch-upstream
+.PHONY: all build check test parity fmt docker-build docker-run docker-stop audit-site oracle oracle-up oracle-down help fetch-upstream
 
 CARGO ?= cargo
 UPSTREAM_TESTS ?= $(firstword $(wildcard $(VNU_UPSTREAM_TESTS) ../validator-upstream/tests ../../validator-upstream/tests ./validator-upstream/tests))
@@ -18,7 +18,7 @@ help:
 	@echo "  make docker-build   - Build minimal Debian release Docker image"
 	@echo "  make docker-run     - Run vnu-rs daemon in Docker (:$(DOCKER_PORT)->8888)"
 	@echo "  make docker-stop    - Stop and remove vnu-rs Docker container"
-	@echo "  make oracle         - Run differential oracle against Java vnu (:8888)"
+	@echo "  make oracle         - Diff vnu-rs vs Java vnu on the corpus (make oracle-up first; :8899)"
 	@echo "  make audit-site     - Crawl and compare production pages against Java & Rust"
 
 build:
@@ -62,8 +62,14 @@ docker-run:
 docker-stop:
 	docker rm -f vnu-rs 2>/dev/null || true
 
+oracle-up:
+	docker run -d --rm --name vnu-java-oracle -p 127.0.0.1:8899:8888 ghcr.io/validator/validator:latest
+
+oracle-down:
+	docker stop vnu-java-oracle
+
 oracle:
-	$(CARGO) test -p vnu-oracle -- --nocapture
+	$(CARGO) run --release -p vnu-oracle --bin oracle_diff
 
 audit-site:
 	@SITEMAP_URL="$(SITEMAP)" python3 ./scripts/audit_site.py
