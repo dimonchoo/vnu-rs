@@ -5,6 +5,7 @@ pub mod rule;
 pub mod rules;
 pub mod schema;
 pub mod syntax;
+pub mod treebuilder;
 
 pub use context::{ElementContext, LineIndex, SourceLocation, ValidationContext};
 pub use engine::{CheckMode, ValidatorEngine};
