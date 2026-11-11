@@ -5,6 +5,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
 use vnu_core::{MessageSubType, MessageType, VNuMessage, VNuReport};
 use vnu_parser::ValidatorEngine;
+use vnu_parser::schema::relaxng::messages::display_wording;
 
 pub struct ThreadBatchResult {
     pub total: usize,
@@ -60,8 +61,9 @@ pub fn case_passes(key: &str, expected: Option<&str>, report: &VNuReport, strict
             _ => {}
         }
     }
+    // TestRunner compares getDisplayMessage(), falling back to getMessage().
     let first_equals = |m: Option<&VNuMessage>| match (m, expected) {
-        (Some(m), Some(exp)) => normalize(&m.message) == normalize(exp),
+        (Some(m), Some(exp)) => normalize(&display_wording(&m.message)) == normalize(exp),
         _ => false,
     };
     if key.contains("novalid") {

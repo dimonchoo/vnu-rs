@@ -63,10 +63,15 @@ impl Rule for ForeignSvgRule {
             }
         }
 
-        // 2. SVG xmlns checks
+        // 2. SVG xmlns checks (the tree builder's checkAttributes for HTML parsing)
         let in_foreign_object =
             ctx.is_descendant_of("foreignObject") || ctx.is_descendant_of("foreignobject");
-        for (attr_name, attr_val) in tag.attrs.iter() {
+        let xmlns_attrs = if ctx.html_parser {
+            &[][..]
+        } else {
+            &tag.attrs[..]
+        };
+        for (attr_name, attr_val) in xmlns_attrs.iter() {
             let attr_lower = attr_name.to_ascii_lowercase();
             if attr_lower == "xmlns" {
                 if !in_foreign_object && attr_val != "http://www.w3.org/2000/svg" {

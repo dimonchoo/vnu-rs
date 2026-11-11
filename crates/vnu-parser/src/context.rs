@@ -117,6 +117,9 @@ pub struct ValidationContext<'a> {
     pub title_seen: bool,
     pub body_seen: bool,
     pub is_xhtml: bool,
+    /// True when the document goes through the HTML tree builder (not XHTML or SVG,
+    /// which Java parses as XML).
+    pub html_parser: bool,
     pub id_to_tag: std::collections::HashMap<String, String>,
     pub line_index: Option<&'a LineIndex>,
 }
@@ -135,6 +138,7 @@ impl<'a> ValidationContext<'a> {
             title_seen: false,
             body_seen: false,
             is_xhtml,
+            html_parser: false,
             id_to_tag: std::collections::HashMap::new(),
             line_index: None,
         }

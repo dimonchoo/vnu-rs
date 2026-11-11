@@ -1,0 +1,1689 @@
+datatypes w = "http://whattf.org/datatype-draft"
+# #####################################################################
+##  RELAX NG Schema for HTML 5: Obsolete Elements and Attributes      #
+# #####################################################################
+
+## In order to work around RELAX NG limitations and to thereby get more
+## useful error messages, the following elements and attributes are
+## allowed here but disallowed in the assertions-checking code.
+
+## Obsolete elements
+
+## Centering: <center>
+
+	center.elem =
+		element center { common.inner.anything & common.attr.anything }
+
+	common.elem.flow |= center.elem
+
+## Inline Styling: <font>
+
+	font.elem =
+		element font { common.inner.anything & common.attr.anything }
+
+	common.elem.phrasing |= font.elem
+
+## Base Font Size: <basefont>
+
+	basefont.elem =
+		element basefont { common.inner.anything & common.attr.anything }
+
+	common.elem.flow |= basefont.elem
+
+## Larger Font: <big>
+
+	big.elem =
+		element big { common.inner.anything & common.attr.anything }
+
+	common.elem.phrasing |= big.elem
+
+## Struck Text: <strike>
+
+	strike.elem =
+		element strike { common.inner.anything & common.attr.anything }
+
+	common.elem.phrasing |= strike.elem
+
+## Teletype: <tt>
+
+	tt.elem =
+		element tt { common.inner.anything & common.attr.anything }
+
+	common.elem.phrasing |= tt.elem
+
+## Abbreviation: <acronym>
+
+	acronym.elem =
+		element acronym { common.inner.anything & common.attr.anything }
+
+	common.elem.phrasing |= acronym.elem
+
+## Directory: <dir>
+
+	dir.elem =
+		element dir { common.inner.anything & common.attr.anything }
+
+	common.elem.flow |= dir.elem
+
+## Java Applets: <applet>
+
+	applet.elem =
+		element applet { common.inner.anything & common.attr.anything }
+
+	common.elem.flow |= applet.elem
+	common.elem.phrasing |= applet.elem
+
+## Initialization Parameters: <param>
+
+	param.elem =
+		element param { common.inner.anything & common.attr.anything }
+
+	common.elem.flow |= param.elem
+	common.elem.phrasing |= param.elem
+
+## Frame Set: <frameset>
+
+	frameset.elem =
+		element frameset { common.inner.anything & common.attr.anything }
+
+## Frame: <frame>
+
+	frame.elem =
+		element frame { common.inner.anything & common.attr.anything }
+
+## Alternate no-frames content: <noframes>
+
+	noframes.elem =
+		element noframes { common.inner.anything & common.attr.anything }
+
+	common.elem.flow |= noframes.elem
+
+## "content-language" pragma directive: <meta http-equiv='content-language'>
+
+	meta.http-equiv.content-language.elem =
+		element meta { meta.inner & meta.http-equiv.content-language.attrs }
+	meta.http-equiv.content-language.attrs =
+		(	common.attrs.basic
+		&	common.attrs.i18n
+		&	common.attrs.present
+		&	common.attrs.other
+		&	meta.http-equiv.attrs.http-equiv.content-language
+		&	meta.http-equiv.attrs.content.content-language?
+		)
+		meta.http-equiv.attrs.http-equiv.content-language =
+			attribute http-equiv {
+				w:string "content-language"
+			}
+		meta.http-equiv.attrs.content.content-language =
+			attribute content {
+				string
+			}
+
+	common.elem.metadata |= meta.http-equiv.content-language.elem # not quite right per spec
+                                                               # if the definition is
+                                                               # reused in another language
+
+## Key-pair generator/input control: <keygen>
+
+	keygen.elem =
+		element keygen { common.inner.anything & common.attr.anything }
+
+	common.elem.phrasing |= keygen.elem
+
+## Background Sound: <bgsound>
+
+	bgsound.elem =
+		element bgsound { common.inner.anything & common.attr.anything }
+
+	common.elem.phrasing |= bgsound.elem
+
+## Single line text input: <isindex>
+
+	isindex.elem =
+		element isindex { common.inner.anything & common.attr.anything }
+
+	common.elem.phrasing |= isindex.elem
+
+## Render HTML code on page: <listing>
+
+	listing.elem =
+		element listing { common.inner.anything & common.attr.anything }
+
+	common.elem.phrasing |= listing.elem
+
+## Command item that the user can invoke from a popup menu: <menuitem>
+
+	menuitem.elem =
+		element menuitem { common.inner.anything & common.attr.anything }
+
+	common.elem.phrasing |= menuitem.elem
+
+## Next document-wide numeric identifier: <nextid>
+
+	nextid.elem =
+		element nextid { common.inner.anything & common.attr.anything }
+
+	common.elem.phrasing |= nextid.elem
+
+## Embed Fallback: <noembed>
+
+	noembed.elem =
+		element noembed { common.inner.anything & common.attr.anything }
+
+	common.elem.phrasing |= noembed.elem
+
+## Render as raw text: <plaintext>
+
+	plaintext.elem =
+		element plaintext { common.inner.anything & common.attr.anything }
+
+	common.elem.phrasing |= plaintext.elem
+
+## Display code: <xmp>
+
+	xmp.elem =
+		element xmp { common.inner.anything & common.attr.anything }
+
+	common.elem.phrasing |= xmp.elem
+
+## Blinking Text: <blink>
+
+	blink.elem =
+		element blink { common.inner.anything & common.attr.anything }
+
+	common.elem.phrasing |= blink.elem
+
+## Insert scrolling area: <marquee>
+
+	marquee.elem =
+		element marquee { common.inner.anything & common.attr.anything }
+
+	common.elem.phrasing |= marquee.elem
+
+## Multi-column layout: <multicol>
+
+	multicol.elem =
+		element multicol { common.inner.anything & common.attr.anything }
+
+	common.elem.phrasing |= multicol.elem
+
+## Line break not allowed: <nobr>
+
+	nobr.elem =
+		element nobr { common.inner.anything & common.attr.anything }
+
+	common.elem.phrasing |= nobr.elem
+
+## Insert empty spaces: <spacer>
+
+	spacer.elem =
+		element spacer { common.inner.anything & common.attr.anything }
+
+	common.elem.phrasing |= spacer.elem
+
+## Obsolete attributes
+
+## abbr attribute
+
+	td.attrs.abbr =
+		attribute abbr {
+			string
+		}
+	td.attrs &= td.attrs.abbr?
+
+	th.attrs.abbr =
+		attribute abbr {
+			string
+		}
+	th.attrs &= th.attrs.abbr?
+
+## archive attribute
+
+	object.attrs.archive =
+		attribute archive {
+			string
+		}
+	object.attrs &= object.attrs.archive?
+
+## axis attribute
+
+	td.attrs.axis =
+		attribute axis {
+			string
+		}
+	td.attrs &= td.attrs.axis?
+
+	th.attrs.axis =
+		attribute axis {
+			string
+		}
+	th.attrs &= th.attrs.axis?
+
+## charset attribute
+
+	link.attrs.charset =
+		attribute charset {
+			string
+		}
+	link.attrs &= link.attrs.charset?
+
+	a.attrs.charset =
+		attribute charset {
+			string
+		}
+	a.attrs &= a.attrs.charset?
+
+	script.attrs.charset =
+		attribute charset {
+			string
+		}
+	script.attrs.imported &= script.attrs.charset?
+	script.attrs.embedded &= script.attrs.charset?
+
+## classid attribute
+
+	object.attrs.classid =
+		attribute classid {
+			common.data.uri
+		}
+	object.attrs &= object.attrs.classid?
+
+## codebase attribute
+
+	object.attrs.codebase =
+		attribute codebase {
+			common.data.uri
+		}
+	object.attrs &= object.attrs.codebase?
+
+## codetype attribute
+
+	object.attrs.codetype =
+		attribute codetype {
+			common.data.mimetype
+		}
+	object.attrs &= object.attrs.codetype?
+
+## code attribute
+
+	object.attrs.code =
+		attribute code {
+			token
+		}
+	object.attrs &= object.attrs.code?
+
+## coords attribute
+
+	a.attrs.coords =
+		attribute coords {
+			string
+		}
+	a.attrs &= a.attrs.coords?
+
+## declare attribute
+
+	object.attrs.declare =
+		attribute declare {
+			string
+		}
+	object.attrs &= object.attrs.declare?
+
+## longdesc attribute
+
+	img.attrs.longdesc =
+		attribute longdesc {
+			common.data.uri.non-empty
+		}
+	img.attrs &= img.attrs.longdesc?
+
+	iframe.attrs.longdesc =
+		attribute longdesc {
+			string
+		}
+	iframe.attrs &= iframe.attrs.longdesc?
+
+## methods attribute
+
+	a.attrs.methods =
+		attribute methods {
+			string
+		}
+	a.attrs &= a.attrs.methods?
+
+	link.attrs.methods =
+		attribute methods {
+			string
+		}
+	link.attrs &= link.attrs.methods?
+
+## name attribute
+
+	a.attrs.name =
+		attribute name {
+			string
+		}
+	a.attrs &= a.attrs.name?
+
+	img.attrs.name =
+		attribute name {
+			string
+		}
+	img.attrs &= img.attrs.name?
+
+	embed.attrs.name =
+		attribute name {
+			string
+		}
+	embed.attrs &= embed.attrs.name?
+
+	option.attrs.name =
+		attribute name {
+			string
+		}
+	option.attrs &= option.attrs.name?
+
+## nohref attribute
+
+	area.attrs.nohref =
+		attribute nohref {
+			string
+		}
+	area.attrs &= area.attrs.nohref?
+
+## profile attribute
+
+	head.attrs.profile =
+		attribute profile {
+			string
+		}
+	head.attrs &= head.attrs.profile?
+
+## rev attribute
+
+	link.attrs.rev =
+		attribute rev {
+			string
+		}
+	link.attrs &= link.attrs.rev?
+
+	a.attrs.rev =
+		attribute rev {
+			string
+		}
+	a.attrs &= a.attrs.rev?
+
+## scheme attribute
+
+	meta.attrs.scheme =
+		attribute scheme {
+			string
+		}
+	meta.name.attrs &= meta.attrs.scheme?
+
+## scope attribute
+
+	td.attrs.scope =
+		attribute scope {
+			string
+		}
+	td.attrs &= td.attrs.scope?
+
+## shape attribute
+
+	a.attrs.shape =
+		attribute shape {
+			string
+		}
+	a.attrs &= a.attrs.shape?
+
+## standby attribute
+
+	object.attrs.standby =
+		attribute standby {
+			string
+		}
+	object.attrs &= object.attrs.standby?
+
+## target attribute
+
+	link.attrs.target =
+		attribute target {
+			string
+		}
+	link.attrs &= link.attrs.target?
+
+## urn attribute
+
+	a.attrs.urn =
+		attribute urn {
+			string
+		}
+	a.attrs &= a.attrs.urn?
+
+	link.attrs.urn =
+		attribute urn {
+			string
+		}
+	link.attrs &= link.attrs.urn?
+
+## usemap attribute
+
+	input.attrs.usemap =
+		attribute usemap {
+			string
+		}
+	input.image.attrs &= input.attrs.usemap?
+
+	object.attrs.usemap =
+		attribute usemap {
+			string
+		}
+	object.attrs &= object.attrs.usemap?
+
+## valuetype attribute
+
+	param.attrs.valuetype =
+		attribute valuetype {
+			string
+		}
+	param.attrs &= param.attrs.valuetype?
+
+## version attribute
+
+	html.attrs.version =
+		attribute version {
+			string
+		}
+	html.attrs &= html.attrs.version?
+
+## Obsolete ARIA attributes
+
+	aria.state.grabbed =
+		attribute aria-grabbed {
+			string
+		}
+	aria.state.dropeffect =
+		attribute aria-dropeffect {
+			string
+		}
+	aria.global &= aria.state.grabbed?
+	aria.global &= aria.state.dropeffect?
+
+## Obsolete style attributes
+
+## align attribute
+
+	caption.attrs.align =
+		attribute align {
+			string
+		}
+	caption.attrs &= caption.attrs.align?
+
+	col.attrs.align =
+		attribute align {
+			string
+		}
+	col.attrs &= col.attrs.align?
+
+	colgroup.attrs.align =
+		attribute align {
+			string
+		}
+	colgroup.attrs &= colgroup.attrs.align?
+
+	div.attrs.align =
+		attribute align {
+			string
+		}
+	div.attrs &= div.attrs.align?
+
+	embed.attrs.align =
+		attribute align {
+			string
+		}
+	embed.attrs &= embed.attrs.align?
+
+	h1.attrs.align =
+		attribute align {
+			string
+		}
+	h1.attrs &= h1.attrs.align?
+
+	h2.attrs.align =
+		attribute align {
+			string
+		}
+	h2.attrs &= h2.attrs.align?
+
+	h3.attrs.align =
+		attribute align {
+			string
+		}
+	h3.attrs &= h3.attrs.align?
+
+	h4.attrs.align =
+		attribute align {
+			string
+		}
+	h4.attrs &= h4.attrs.align?
+
+	h5.attrs.align =
+		attribute align {
+			string
+		}
+	h5.attrs &= h5.attrs.align?
+
+	h6.attrs.align =
+		attribute align {
+			string
+		}
+	h6.attrs &= h6.attrs.align?
+
+	hr.attrs.align =
+		attribute align {
+			string
+		}
+	hr.attrs &= hr.attrs.align?
+
+	iframe.attrs.align =
+		attribute align {
+			string
+		}
+	iframe.attrs &= iframe.attrs.align?
+
+	img.attrs.align =
+		attribute align {
+			string
+		}
+	img.attrs &= img.attrs.align?
+
+	input.attrs.align =
+		attribute align {
+			string
+		}
+	input.text.attrs &= input.attrs.align?
+	input.password.attrs &= input.attrs.align?
+	input.checkbox.attrs &= input.attrs.align?
+	input.radio.attrs &= input.attrs.align?
+	input.button.attrs &= input.attrs.align?
+	input.submit.attrs &= input.attrs.align?
+	input.reset.attrs &= input.attrs.align?
+	input.file.attrs &= input.attrs.align?
+	input.image.attrs &= input.attrs.align?
+	input.datetime.attrs &= input.attrs.align?
+	input.datetime-local.attrs &= input.attrs.align?
+	input.date.attrs &= input.attrs.align?
+	input.month.attrs &= input.attrs.align?
+	input.time.attrs &= input.attrs.align?
+	input.week.attrs &= input.attrs.align?
+	input.number.attrs &= input.attrs.align?
+	input.range.attrs &= input.attrs.align?
+	input.email.attrs &= input.attrs.align?
+	input.url.attrs &= input.attrs.align?
+	input.search.attrs &= input.attrs.align?
+	input.tel.attrs &= input.attrs.align?
+	input.color.attrs &= input.attrs.align?
+
+	legend.attrs.align =
+		attribute align {
+			string
+		}
+	legend.attrs &= legend.attrs.align?
+
+	object.attrs.align =
+		attribute align {
+			string
+		}
+	object.attrs &= object.attrs.align?
+
+	p.attrs.align =
+		attribute align {
+			string
+		}
+	p.attrs &= p.attrs.align?
+
+	table.attrs.align =
+		attribute align {
+			string
+		}
+	table.attrs &= table.attrs.align?
+
+	tbody.attrs.align =
+		attribute align {
+			string
+		}
+	tbody.attrs &= tbody.attrs.align?
+
+	td.attrs.align =
+		attribute align {
+			string
+		}
+	td.attrs &= td.attrs.align?
+
+	tfoot.attrs.align =
+		attribute align {
+			string
+		}
+	tfoot.attrs &= tfoot.attrs.align?
+
+	th.attrs.align =
+		attribute align {
+			string
+		}
+	th.attrs &= th.attrs.align?
+
+	thead.attrs.align =
+		attribute align {
+			string
+		}
+	thead.attrs &= thead.attrs.align?
+
+	tr.attrs.align =
+		attribute align {
+			string
+		}
+	tr.attrs &= tr.attrs.align?
+
+## alink attribute
+
+	body.attrs.alink =
+		attribute alink {
+			string
+		}
+	body.attrs &= body.attrs.alink?
+
+	iframe.attrs.allowtransparency =
+		attribute allowtransparency {
+			string
+		}
+	iframe.attrs &= iframe.attrs.allowtransparency?
+
+## background attribute
+
+	body.attrs.background =
+		attribute background {
+			string
+		}
+	body.attrs &= body.attrs.background?
+
+	table.attrs.background =
+		attribute background {
+			string
+		}
+	table.attrs &= table.attrs.background?
+
+	thead.attrs.background =
+		attribute background {
+			string
+		}
+	thead.attrs &= thead.attrs.background?
+
+	tbody.attrs.background =
+		attribute background {
+			string
+		}
+	tbody.attrs &= tbody.attrs.background?
+
+	tfoot.attrs.background =
+		attribute background {
+			string
+		}
+	tfoot.attrs &= tfoot.attrs.background?
+
+	tr.attrs.background =
+		attribute background {
+			string
+		}
+	tr.attrs &= tr.attrs.background?
+
+	td.attrs.background =
+		attribute background {
+			string
+		}
+	td.attrs &= td.attrs.background?
+
+	th.attrs.background =
+		attribute background {
+			string
+		}
+	th.attrs &= th.attrs.background?
+
+## color attribute
+
+	hr.attrs.color =
+		attribute color {
+			string
+		}
+	hr.attrs &= hr.attrs.color?
+
+
+## bgcolor attribute
+
+	body.attrs.bgcolor =
+		attribute bgcolor {
+			string
+		}
+	body.attrs &= body.attrs.bgcolor?
+
+	table.attrs.bgcolor =
+		attribute bgcolor {
+			string
+		}
+	table.attrs &= table.attrs.bgcolor?
+
+	tr.attrs.bgcolor =
+		attribute bgcolor {
+			string
+		}
+	tr.attrs &= tr.attrs.bgcolor?
+
+	td.attrs.bgcolor =
+		attribute bgcolor {
+			string
+		}
+	td.attrs &= td.attrs.bgcolor?
+
+	th.attrs.bgcolor =
+		attribute bgcolor {
+			string
+		}
+	th.attrs &= th.attrs.bgcolor?
+
+## border attribute
+
+	input.attrs.border =
+		attribute border {
+			string
+		}
+	input.text.attrs &= input.attrs.border?
+	input.password.attrs &= input.attrs.border?
+	input.checkbox.attrs &= input.attrs.border?
+	input.radio.attrs &= input.attrs.border?
+	input.button.attrs &= input.attrs.border?
+	input.submit.attrs &= input.attrs.border?
+	input.reset.attrs &= input.attrs.border?
+	input.file.attrs &= input.attrs.border?
+	input.image.attrs &= input.attrs.border?
+	input.datetime.attrs &= input.attrs.border?
+	input.datetime-local.attrs &= input.attrs.border?
+	input.date.attrs &= input.attrs.border?
+	input.month.attrs &= input.attrs.border?
+	input.time.attrs &= input.attrs.border?
+	input.week.attrs &= input.attrs.border?
+	input.number.attrs &= input.attrs.border?
+	input.range.attrs &= input.attrs.border?
+	input.email.attrs &= input.attrs.border?
+	input.url.attrs &= input.attrs.border?
+	input.search.attrs &= input.attrs.border?
+	input.tel.attrs &= input.attrs.border?
+	input.color.attrs &= input.attrs.border?
+
+	img.attrs.border =
+		attribute border {
+			string
+		}
+	img.attrs &= img.attrs.border?
+
+	object.attrs.border =
+		attribute border {
+			string
+		}
+	object.attrs &= object.attrs.border?
+
+	table.attrs.border  =
+		attribute border {
+			string
+		}
+	table.attrs &= table.attrs.border?
+
+## cellpadding attribute
+
+	table.attrs.cellpadding =
+		attribute cellpadding {
+			string
+		}
+	table.attrs &= table.attrs.cellpadding?
+
+## cellspacing attribute
+
+	table.attrs.cellspacing =
+		attribute cellspacing {
+			string
+		}
+	table.attrs &= table.attrs.cellspacing?
+
+## char attribute
+
+	col.attrs.char =
+		attribute char {
+			string
+		}
+	col.attrs &= col.attrs.char?
+
+	colgroup.attrs.char =
+		attribute char {
+			string
+		}
+	colgroup.attrs &= colgroup.attrs.char?
+
+	tbody.attrs.char =
+		attribute char {
+			string
+		}
+	tbody.attrs &= tbody.attrs.char?
+
+	td.attrs.char =
+		attribute char {
+			string
+		}
+	td.attrs &= td.attrs.char?
+
+	tfoot.attrs.char =
+		attribute char {
+			string
+		}
+	tfoot.attrs &= tfoot.attrs.char?
+
+	th.attrs.char =
+		attribute char {
+			string
+		}
+	th.attrs &= th.attrs.char?
+
+	thead.attrs.char =
+		attribute char {
+			string
+		}
+	thead.attrs &= thead.attrs.char?
+
+	tr.attrs.char =
+		attribute char {
+			string
+		}
+	tr.attrs &= tr.attrs.char?
+
+## charoff attribute
+
+	col.attrs.charoff =
+		attribute charoff {
+			string
+		}
+	col.attrs &= col.attrs.charoff?
+
+	colgroup.attrs.charoff =
+		attribute charoff {
+			string
+		}
+	colgroup.attrs &= colgroup.attrs.charoff?
+
+	tbody.attrs.charoff =
+		attribute charoff {
+			string
+		}
+	tbody.attrs &= tbody.attrs.charoff?
+
+	td.attrs.charoff =
+		attribute charoff {
+			string
+		}
+	td.attrs &= td.attrs.charoff?
+
+	tfoot.attrs.charoff =
+		attribute charoff {
+			string
+		}
+	tfoot.attrs &= tfoot.attrs.charoff?
+
+	th.attrs.charoff =
+		attribute charoff {
+			string
+		}
+	th.attrs &= th.attrs.charoff?
+
+	thead.attrs.charoff =
+		attribute charoff {
+			string
+		}
+	thead.attrs &= thead.attrs.charoff?
+
+	tr.attrs.charoff =
+		attribute charoff {
+			string
+		}
+	tr.attrs &= tr.attrs.charoff?
+
+## clear attribute
+
+	br.attrs.clear =
+		attribute clear {
+			string
+		}
+	br.attrs &= br.attrs.clear?
+
+## compact attribute
+
+	dl.attrs.compact =
+		attribute compact {
+			string
+		}
+	dl.attrs &= dl.attrs.compact?
+
+	menu.attrs.compact =
+		attribute compact {
+			string
+		}
+	menu.attrs &= menu.attrs.compact?
+
+	ol.attrs.compact =
+		attribute compact {
+			string
+		}
+	ol.attrs &= ol.attrs.compact?
+
+	ul.attrs.compact =
+		attribute compact {
+			string
+		}
+	ul.attrs &= ul.attrs.compact?
+
+## frame attribute
+
+	table.attrs.frame =
+		attribute frame {
+			string
+		}
+	table.attrs &= table.attrs.frame?
+
+## frameborder attribute
+
+	iframe.attrs.frameborder =
+		attribute frameborder {
+			string
+		}
+	iframe.attrs &= iframe.attrs.frameborder?
+
+## height attribute
+
+	table.attrs.height =
+		attribute height {
+			string
+		}
+	table.attrs &= table.attrs.height?
+
+	thead.attrs.height =
+		attribute height {
+			string
+		}
+	thead.attrs &= thead.attrs.height?
+
+	tbody.attrs.height =
+		attribute height {
+			string
+		}
+	tbody.attrs &= tbody.attrs.height?
+
+	tfoot.attrs.height =
+		attribute height {
+			string
+		}
+	tfoot.attrs &= tfoot.attrs.height?
+
+	tr.attrs.height =
+		attribute height {
+			string
+		}
+	tr.attrs &= tr.attrs.height?
+
+	td.attrs.height =
+		attribute height {
+			string
+		}
+	td.attrs &= td.attrs.height?
+
+	th.attrs.height =
+		attribute height {
+			string
+		}
+	th.attrs &= th.attrs.height?
+
+## hspace attribute
+
+	embed.attrs.hspace =
+		attribute hspace {
+			string
+		}
+	embed.attrs &= embed.attrs.hspace?
+
+	iframe.attrs.hspace =
+		attribute hspace {
+			string
+		}
+	iframe.attrs &= iframe.attrs.hspace?
+
+	input.attrs.hspace =
+		attribute hspace {
+			string
+		}
+	input.text.attrs &= input.attrs.hspace?
+	input.password.attrs &= input.attrs.hspace?
+	input.checkbox.attrs &= input.attrs.hspace?
+	input.radio.attrs &= input.attrs.hspace?
+	input.button.attrs &= input.attrs.hspace?
+	input.submit.attrs &= input.attrs.hspace?
+	input.reset.attrs &= input.attrs.hspace?
+	input.file.attrs &= input.attrs.hspace?
+	input.image.attrs &= input.attrs.hspace?
+	input.datetime.attrs &= input.attrs.hspace?
+	input.datetime-local.attrs &= input.attrs.hspace?
+	input.date.attrs &= input.attrs.hspace?
+	input.month.attrs &= input.attrs.hspace?
+	input.time.attrs &= input.attrs.hspace?
+	input.week.attrs &= input.attrs.hspace?
+	input.number.attrs &= input.attrs.hspace?
+	input.range.attrs &= input.attrs.hspace?
+	input.email.attrs &= input.attrs.hspace?
+	input.url.attrs &= input.attrs.hspace?
+	input.search.attrs &= input.attrs.hspace?
+	input.tel.attrs &= input.attrs.hspace?
+	input.color.attrs &= input.attrs.hspace?
+
+	img.attrs.hspace =
+		attribute hspace {
+			string
+		}
+	img.attrs &= img.attrs.hspace?
+
+	object.attrs.hspace =
+		attribute hspace {
+			string
+		}
+	object.attrs &= object.attrs.hspace?
+
+## link attribute
+
+	body.attrs.link =
+		attribute link {
+			string
+		}
+	body.attrs &= body.attrs.link?
+
+## bottommargin attribute
+
+	body.attrs.bottommargin =
+		attribute bottommargin {
+			string
+		}
+	body.attrs &= body.attrs.bottommargin?
+
+## marginheight attribute
+
+	body.attrs.marginheight =
+		attribute marginheight {
+			string
+		}
+	body.attrs &= body.attrs.marginheight?
+
+	iframe.attrs.marginheight =
+		attribute marginheight {
+			string
+		}
+	iframe.attrs &= iframe.attrs.marginheight?
+
+## leftmargin attribute
+
+	body.attrs.leftmargin =
+		attribute leftmargin {
+			string
+		}
+	body.attrs &= body.attrs.leftmargin?
+
+## rightmargin attribute
+
+	body.attrs.rightmargin =
+		attribute rightmargin {
+			string
+		}
+	body.attrs &= body.attrs.rightmargin?
+
+## topmargin attribute
+
+	body.attrs.topmargin =
+		attribute topmargin {
+			string
+		}
+	body.attrs &= body.attrs.topmargin?
+
+## marginwidth attribute
+
+	body.attrs.marginwidth =
+		attribute marginwidth {
+			string
+		}
+	body.attrs &= body.attrs.marginwidth?
+
+	iframe.attrs.marginwidth =
+		attribute marginwidth {
+			string
+		}
+	iframe.attrs &= iframe.attrs.marginwidth?
+
+## noshade attribute
+
+	hr.attrs.noshade =
+		attribute noshade {
+			string
+		}
+	hr.attrs &= hr.attrs.noshade?
+
+## nowrap attribute
+
+	td.attrs.nowrap =
+		attribute nowrap {
+			string
+		}
+	td.attrs &= td.attrs.nowrap?
+
+	th.attrs.nowrap =
+		attribute nowrap {
+			string
+		}
+	th.attrs &= th.attrs.nowrap?
+
+## rules attribute
+
+	table.attrs.rules =
+		attribute rules {
+			string
+		}
+	table.attrs &= table.attrs.rules?
+
+## datapagesize attribute
+
+	table.attrs.datapagesize =
+		attribute datapagesize {
+			string
+		}
+	table.attrs &= table.attrs.datapagesize?
+
+## scrolling attribute
+
+	iframe.attrs.scrolling =
+		attribute scrolling {
+			string
+		}
+	iframe.attrs &= iframe.attrs.scrolling?
+
+## size attribute
+
+	hr.attrs.size =
+		attribute size {
+			string
+		}
+	hr.attrs &= hr.attrs.size?
+
+## summary attribute
+
+	table.attrs.summary =
+		attribute summary {
+			string
+		}
+	table.attrs &= table.attrs.summary?
+
+## text attribute
+
+	body.attrs.text =
+		attribute text {
+			string
+		}
+	body.attrs &= body.attrs.text?
+
+## type attribute
+
+	li.attrs.type =
+		attribute type {
+			string
+		}
+	li.attrs &= li.attrs.type?
+	oli.attrs &= li.attrs.type?
+
+	ul.attrs.type =
+		attribute type {
+			string
+		}
+	ul.attrs &= ul.attrs.type?
+
+	param.attrs.type =
+		attribute type {
+			string
+		}
+	param.attrs &= param.attrs.type?
+
+	style.attrs.type =
+		attribute type {
+			string
+		}
+	style.attrs &= style.attrs.type?
+
+	menu.attrs.type =
+		attribute type {
+			string
+		}
+	menu.attrs &= menu.attrs.type?
+
+## valign attribute
+
+	col.attrs.valign =
+		attribute valign {
+			string
+		}
+	col.attrs &= col.attrs.valign?
+
+	colgroup.attrs.valign =
+		attribute valign {
+			string
+		}
+	colgroup.attrs &= colgroup.attrs.valign?
+
+	table.attrs.valign =
+		attribute valign {
+			string
+		}
+	table.attrs &= table.attrs.valign?
+
+	tbody.attrs.valign =
+		attribute valign {
+			string
+		}
+	tbody.attrs &= tbody.attrs.valign?
+
+	td.attrs.valign =
+		attribute valign {
+			string
+		}
+	td.attrs &= td.attrs.valign?
+
+	tfoot.attrs.valign =
+		attribute valign {
+			string
+		}
+	tfoot.attrs &= tfoot.attrs.valign?
+
+	th.attrs.valign =
+		attribute valign {
+			string
+		}
+	th.attrs &= th.attrs.valign?
+
+	thead.attrs.valign =
+		attribute valign {
+			string
+		}
+	thead.attrs &= thead.attrs.valign?
+
+	tr.attrs.valign =
+		attribute valign {
+			string
+		}
+	tr.attrs &= tr.attrs.valign?
+
+## vlink attribute
+
+	body.attrs.vlink =
+		attribute vlink {
+			string
+		}
+	body.attrs &= body.attrs.vlink?
+
+## vspace attribute
+
+	embed.attrs.vspace =
+		attribute vspace {
+			string
+		}
+	embed.attrs &= embed.attrs.vspace?
+
+	iframe.attrs.vspace =
+		attribute vspace {
+			string
+		}
+	iframe.attrs &= iframe.attrs.vspace?
+
+	input.attrs.vspace =
+		attribute vspace {
+			string
+		}
+	input.text.attrs &= input.attrs.vspace?
+	input.password.attrs &= input.attrs.vspace?
+	input.checkbox.attrs &= input.attrs.vspace?
+	input.radio.attrs &= input.attrs.vspace?
+	input.button.attrs &= input.attrs.vspace?
+	input.submit.attrs &= input.attrs.vspace?
+	input.reset.attrs &= input.attrs.vspace?
+	input.file.attrs &= input.attrs.vspace?
+	input.image.attrs &= input.attrs.vspace?
+	input.datetime.attrs &= input.attrs.vspace?
+	input.datetime-local.attrs &= input.attrs.vspace?
+	input.date.attrs &= input.attrs.vspace?
+	input.month.attrs &= input.attrs.vspace?
+	input.time.attrs &= input.attrs.vspace?
+	input.week.attrs &= input.attrs.vspace?
+	input.number.attrs &= input.attrs.vspace?
+	input.range.attrs &= input.attrs.vspace?
+	input.email.attrs &= input.attrs.vspace?
+	input.url.attrs &= input.attrs.vspace?
+	input.search.attrs &= input.attrs.vspace?
+	input.tel.attrs &= input.attrs.vspace?
+	input.color.attrs &= input.attrs.vspace?
+
+	img.attrs.vspace =
+		attribute vspace {
+			string
+		}
+	img.attrs &= img.attrs.vspace?
+
+	object.attrs.vspace =
+		attribute vspace {
+			string
+		}
+	object.attrs &= object.attrs.vspace?
+
+## width attribute
+
+	col.attrs.width =
+		attribute width {
+			string
+		}
+	col.attrs &= col.attrs.width?
+
+	colgroup.attrs.width =
+		attribute width {
+			string
+		}
+	colgroup.attrs &= colgroup.attrs.width?
+
+	hr.attrs.width =
+		attribute width {
+			string
+		}
+	hr.attrs &= hr.attrs.width?
+
+	pre.attrs.width =
+		attribute width {
+			string
+		}
+	pre.attrs &= pre.attrs.width?
+
+	table.attrs.width =
+		attribute width {
+			string
+		}
+	table.attrs &= table.attrs.width?
+
+	td.attrs.width =
+		attribute width {
+			string
+		}
+	td.attrs &= td.attrs.width?
+
+	th.attrs.width =
+		attribute width {
+			string
+		}
+	th.attrs &= th.attrs.width?
+
+## event attribute
+
+	script.attrs.event =
+		attribute event {
+			string
+		}
+	script.attrs.imported &= script.attrs.event?
+	script.attrs.embedded &= script.attrs.event?
+
+## for attribute
+
+	script.attrs.for =
+		attribute for {
+			string
+		}
+	script.attrs.imported &= script.attrs.for?
+	script.attrs.embedded &= script.attrs.for?
+
+## datafld attribute
+
+	legacy.attrs.datafld =
+		attribute datafld {
+			string
+		}
+	a.attrs &= legacy.attrs.datafld?
+	span.attrs &= legacy.attrs.datafld?
+	div.attrs &= legacy.attrs.datafld?
+	object.attrs &= legacy.attrs.datafld?
+	input.text.attrs &= legacy.attrs.datafld?
+	input.password.attrs &= legacy.attrs.datafld?
+	input.checkbox.attrs &= legacy.attrs.datafld?
+	input.radio.attrs &= legacy.attrs.datafld?
+	input.button.attrs &= legacy.attrs.datafld?
+	input.submit.attrs &= legacy.attrs.datafld?
+	input.reset.attrs &= legacy.attrs.datafld?
+	input.file.attrs &= legacy.attrs.datafld?
+	input.image.attrs &= legacy.attrs.datafld?
+	input.datetime.attrs &= legacy.attrs.datafld?
+	input.datetime-local.attrs &= legacy.attrs.datafld?
+	input.date.attrs &= legacy.attrs.datafld?
+	input.month.attrs &= legacy.attrs.datafld?
+	input.time.attrs &= legacy.attrs.datafld?
+	input.week.attrs &= legacy.attrs.datafld?
+	input.number.attrs &= legacy.attrs.datafld?
+	input.range.attrs &= legacy.attrs.datafld?
+	input.email.attrs &= legacy.attrs.datafld?
+	input.url.attrs &= legacy.attrs.datafld?
+	input.search.attrs &= legacy.attrs.datafld?
+	input.tel.attrs &= legacy.attrs.datafld?
+	input.color.attrs &= legacy.attrs.datafld?
+	select.attrs &= legacy.attrs.datafld?
+	textarea.attrs &= legacy.attrs.datafld?
+	button.submit.attrs &= legacy.attrs.datafld?
+	button.reset.attrs &= legacy.attrs.datafld?
+	button.button.attrs &= legacy.attrs.datafld?
+	fieldset.attrs &= legacy.attrs.datafld?
+	iframe.attrs &= legacy.attrs.datafld?
+	img.attrs &= legacy.attrs.datafld?
+	label.attrs &= legacy.attrs.datafld?
+	legend.attrs &= legacy.attrs.datafld?
+
+
+## dataformatas attribute
+
+	legacy.attrs.dataformatas =
+		attribute dataformatas {
+			string
+		}
+	span.attrs &= legacy.attrs.dataformatas?
+	div.attrs &= legacy.attrs.dataformatas?
+	object.attrs &= legacy.attrs.dataformatas?
+	input.attrs &= legacy.attrs.dataformatas?
+	input.text.attrs &= legacy.attrs.dataformatas?
+	input.password.attrs &= legacy.attrs.dataformatas?
+	input.checkbox.attrs &= legacy.attrs.dataformatas?
+	input.radio.attrs &= legacy.attrs.dataformatas?
+	input.button.attrs &= legacy.attrs.dataformatas?
+	input.submit.attrs &= legacy.attrs.dataformatas?
+	input.reset.attrs &= legacy.attrs.dataformatas?
+	input.file.attrs &= legacy.attrs.dataformatas?
+	input.image.attrs &= legacy.attrs.dataformatas?
+	input.datetime.attrs &= legacy.attrs.dataformatas?
+	input.datetime-local.attrs &= legacy.attrs.dataformatas?
+	input.date.attrs &= legacy.attrs.dataformatas?
+	input.month.attrs &= legacy.attrs.dataformatas?
+	input.time.attrs &= legacy.attrs.dataformatas?
+	input.week.attrs &= legacy.attrs.dataformatas?
+	input.number.attrs &= legacy.attrs.dataformatas?
+	input.range.attrs &= legacy.attrs.dataformatas?
+	input.email.attrs &= legacy.attrs.dataformatas?
+	input.url.attrs &= legacy.attrs.dataformatas?
+	input.search.attrs &= legacy.attrs.dataformatas?
+	input.tel.attrs &= legacy.attrs.dataformatas?
+	input.color.attrs &= legacy.attrs.dataformatas?
+	select.attrs &= legacy.attrs.dataformatas?
+	button.submit.attrs &= legacy.attrs.dataformatas?
+	button.reset.attrs &= legacy.attrs.dataformatas?
+	button.button.attrs &= legacy.attrs.dataformatas?
+	table.attrs &= legacy.attrs.dataformatas?
+	label.attrs &= legacy.attrs.dataformatas?
+	legend.attrs &= legacy.attrs.dataformatas?
+	option.attrs &= legacy.attrs.dataformatas?
+
+## datasrc attribute
+
+	legacy.attrs.datasrc =
+		attribute datasrc {
+			string
+		}
+	a.attrs &= legacy.attrs.datasrc?
+	span.attrs &= legacy.attrs.datasrc?
+	div.attrs &= legacy.attrs.datasrc?
+	object.attrs &= legacy.attrs.datasrc?
+	input.text.attrs &= legacy.attrs.datasrc?
+	input.password.attrs &= legacy.attrs.datasrc?
+	input.checkbox.attrs &= legacy.attrs.datasrc?
+	input.radio.attrs &= legacy.attrs.datasrc?
+	input.button.attrs &= legacy.attrs.datasrc?
+	input.submit.attrs &= legacy.attrs.datasrc?
+	input.reset.attrs &= legacy.attrs.datasrc?
+	input.file.attrs &= legacy.attrs.datasrc?
+	input.image.attrs &= legacy.attrs.datasrc?
+	input.datetime.attrs &= legacy.attrs.datasrc?
+	input.datetime-local.attrs &= legacy.attrs.datasrc?
+	input.date.attrs &= legacy.attrs.datasrc?
+	input.month.attrs &= legacy.attrs.datasrc?
+	input.time.attrs &= legacy.attrs.datasrc?
+	input.week.attrs &= legacy.attrs.datasrc?
+	input.number.attrs &= legacy.attrs.datasrc?
+	input.range.attrs &= legacy.attrs.datasrc?
+	input.email.attrs &= legacy.attrs.datasrc?
+	input.url.attrs &= legacy.attrs.datasrc?
+	input.search.attrs &= legacy.attrs.datasrc?
+	input.tel.attrs &= legacy.attrs.datasrc?
+	input.color.attrs &= legacy.attrs.datasrc?
+	select.attrs &= legacy.attrs.datasrc?
+	textarea.attrs &= legacy.attrs.datasrc?
+	button.submit.attrs &= legacy.attrs.datasrc?
+	button.reset.attrs &= legacy.attrs.datasrc?
+	button.button.attrs &= legacy.attrs.datasrc?
+	table.attrs &= legacy.attrs.datasrc?
+
+## manifest attribute
+
+	html.attrs.manifest =
+		attribute manifest {
+			string
+		}
+
+	html.attrs &= html.attrs.manifest?
+	iframe.attrs &= legacy.attrs.datasrc?
+	img.attrs &= legacy.attrs.datasrc?
+	label.attrs &= legacy.attrs.datasrc?
+	legend.attrs &= legacy.attrs.datasrc?
+	option.attrs &= legacy.attrs.datasrc?
+
+## accept attribute
+
+	form.attrs.accept =
+		attribute accept {
+			string
+		}
+	form.attrs &= form.attrs.accept?
+
+## contextmenu attribute
+
+	legacy.attrs.contextmenu =
+		attribute contextmenu {
+			string
+		}
+	common.attrs.other &= legacy.attrs.contextmenu?
+
+## dropzone attribute
+
+	legacy.attrs.dropzone =
+		attribute dropzone {
+			string
+		}
+	common.attrs.other &= legacy.attrs.dropzone?
+
+## ismap attribute
+
+	input.attrs.ismap =
+		attribute ismap {
+			string
+		}
+	input.text.attrs &= input.attrs.ismap?
+	input.password.attrs &= input.attrs.ismap?
+	input.checkbox.attrs &= input.attrs.ismap?
+	input.radio.attrs &= input.attrs.ismap?
+	input.button.attrs &= input.attrs.ismap?
+	input.submit.attrs &= input.attrs.ismap?
+	input.reset.attrs &= input.attrs.ismap?
+	input.file.attrs &= input.attrs.ismap?
+	input.image.attrs &= input.attrs.ismap?
+	input.datetime.attrs &= input.attrs.ismap?
+	input.datetime-local.attrs &= input.attrs.ismap?
+	input.date.attrs &= input.attrs.ismap?
+	input.month.attrs &= input.attrs.ismap?
+	input.time.attrs &= input.attrs.ismap?
+	input.week.attrs &= input.attrs.ismap?
+	input.number.attrs &= input.attrs.ismap?
+	input.range.attrs &= input.attrs.ismap?
+	input.email.attrs &= input.attrs.ismap?
+	input.url.attrs &= input.attrs.ismap?
+	input.search.attrs &= input.attrs.ismap?
+	input.tel.attrs &= input.attrs.ismap?
+	input.color.attrs &= input.attrs.ismap?
+
+## label attribute
+
+	menu.attrs.label =
+		attribute label {
+			string
+		}
+	menu.attrs &= menu.attrs.label?
+
+## lowsrc attribute
+
+	img.attrs.lowsrc =
+		attribute lowsrc {
+			string
+		}
+	img.attrs &= img.attrs.lowsrc?
+
+## onshow attribute
+
+	legacy.attrs.onshow =
+		attribute onshow {
+			string
+		}
+	common.attrs.other &= legacy.attrs.onshow?
+
+## typemustmatch attribute
+
+	object.attrs.typemustmatch =
+		attribute typemustmatch {
+			string
+		}
+	object.attrs &= object.attrs.typemustmatch?
+
+## bordercolor attribute
+
+	table.attrs.bordercolor =
+		attribute bordercolor {
+			string
+		}
+	table.attrs &= table.attrs.bordercolor?
+
+## framespacing attribute
+
+	iframe.attrs.framespacing =
+		attribute framespacing {
+			string
+		}
+	iframe.attrs &= iframe.attrs.framespacing?

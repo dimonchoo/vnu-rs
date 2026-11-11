@@ -3,22 +3,26 @@ use super::*;
 
 impl TreeBuilder {
     pub(super) fn append_html_element_to_document_and_push(&mut self, attrs: Attrs) {
+        self.check_attributes(&attrs, Ns::Html);
         let node = self.html_node(&ElemName::lookup("html"), attrs);
         self.push(node);
     }
 
     pub(super) fn append_to_current_node_and_push_head_element(&mut self, attrs: Attrs) {
+        self.check_attributes(&attrs, Ns::Html);
         self.head_pointer = true;
         let node = self.html_node(&ElemName::lookup("head"), attrs);
         self.push(node);
     }
 
     pub(super) fn append_to_current_node_and_push_body_element(&mut self, attrs: Attrs) {
+        self.check_attributes(&attrs, Ns::Html);
         let node = self.html_node(&ElemName::lookup("body"), attrs);
         self.push(node);
     }
 
     pub(super) fn append_to_current_node_and_push_element(&mut self, en: &ElemName, attrs: Attrs) {
+        self.check_attributes(&attrs, Ns::Html);
         let node = self.html_node(en, attrs);
         self.push(node);
     }
@@ -28,6 +32,7 @@ impl TreeBuilder {
         en: &ElemName,
         attrs: Attrs,
     ) {
+        self.check_attributes(&attrs, Ns::Html);
         if self.current_fosters() {
             self.fatal();
         }
@@ -40,6 +45,7 @@ impl TreeBuilder {
         en: &ElemName,
         attrs: Attrs,
     ) {
+        self.check_attributes(&attrs, Ns::Html);
         if self.current_fosters() {
             self.fatal();
         }
@@ -49,6 +55,7 @@ impl TreeBuilder {
     }
 
     pub(super) fn append_to_current_node_and_push_form_element_may_foster(&mut self, attrs: Attrs) {
+        self.check_attributes(&attrs, Ns::Html);
         if self.current_fosters() {
             self.fatal();
         }
@@ -60,6 +67,7 @@ impl TreeBuilder {
     }
 
     pub(super) fn append_to_current_node_and_push_template_element(&mut self, attrs: Attrs) {
+        self.check_attributes(&attrs, Ns::Html);
         let node = self.html_node(&ElemName::lookup("template"), attrs);
         self.push(node);
     }
@@ -70,6 +78,7 @@ impl TreeBuilder {
         attrs: Attrs,
         ns: Ns,
     ) {
+        self.check_attributes(&attrs, ns);
         if self.current_fosters() {
             self.fatal();
         }
@@ -98,6 +107,7 @@ impl TreeBuilder {
         en: &ElemName,
         attrs: Attrs,
     ) {
+        self.check_attributes(&attrs, Ns::Html);
         if self.current_fosters() {
             self.fatal();
         }
@@ -105,6 +115,7 @@ impl TreeBuilder {
     }
 
     pub(super) fn append_void_foreign(&mut self, en: &ElemName, attrs: Attrs, ns: Ns) {
+        self.check_attributes(&attrs, ns);
         if self.current_fosters() {
             self.fatal();
         }
@@ -114,6 +125,33 @@ impl TreeBuilder {
             en.name.clone()
         };
         self.push_pop_void(ns, name, attrs);
+    }
+
+    /// `checkAttributes`: the `xmlns` attributes, which nu htmlparser keeps apart from
+    /// the others (they never reach the checkers or the schema).
+    pub(super) fn check_attributes(&mut self, attrs: &[(String, String)], ns: Ns) {
+        let ns_uri = match ns {
+            Ns::Html => "http://www.w3.org/1999/xhtml",
+            Ns::Svg => "http://www.w3.org/2000/svg",
+            Ns::MathMl => "http://www.w3.org/1998/Math/MathML",
+        };
+        for (name, value) in attrs {
+            if name == "xmlns" {
+                if value != ns_uri {
+                    self.err(format!(
+                        "Bad value “{value}” for the attribute “xmlns” (only “{ns_uri}” permitted here)."
+                    ));
+                }
+            } else if ns != Ns::Html && name == "xmlns:xlink" {
+                if value != "http://www.w3.org/1999/xlink" {
+                    self.err(format!(
+                        "Bad value “{value}” for the attribute “xmlns:link” (only “http://www.w3.org/1999/xlink” permitted here)."
+                    ));
+                }
+            } else if name.starts_with("xmlns:") {
+                self.err(format!("Attribute “{name}” not allowed here."));
+            }
+        }
     }
 
     pub(super) fn push_head_pointer_onto_stack(&mut self) {
@@ -141,6 +179,7 @@ impl TreeBuilder {
     }
 
     pub(super) fn add_attributes_to_html(&mut self, attrs: &[(String, String)]) {
+        self.check_attributes(attrs, Ns::Html);
         self.add_attributes_to(0, attrs);
     }
 }

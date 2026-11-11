@@ -43,11 +43,15 @@ pub fn validate_roles(tag: &ElementContext, elem_name: &str, msgs: &mut Vec<VNuM
                 ));
             }
         }
-        let has_invalid = role_attr.split_whitespace().any(|token| {
-            !VALID_ARIA_ROLES
-                .iter()
-                .any(|&r| r.eq_ignore_ascii_case(token))
-        });
+        // The schema sees the first valid role only
+        // (RoleAttributeFilteringContentHandlerWrapper), so the value is bad only
+        // when no token is a role.
+        let has_invalid = !role_attr.trim().is_empty()
+            && !role_attr.split_whitespace().any(|token| {
+                VALID_ARIA_ROLES
+                    .iter()
+                    .any(|&r| r.eq_ignore_ascii_case(token))
+            });
         if has_invalid {
             msgs.push(VNuMessage::error(
                 format!(

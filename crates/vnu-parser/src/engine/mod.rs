@@ -15,6 +15,7 @@ use crate::context::LineIndex;
 use crate::rule::Rule;
 use crate::rules::style::css_validator::CssValidator;
 use crate::rules::{default_rules, rules_with_options};
+use crate::schema::relaxng::SchemaValidator;
 use html5ever::tokenizer::{BufferQueue, Tokenizer, TokenizerOpts, TokenizerResult};
 use std::cell::RefCell;
 use vnu_core::{VNuMessage, VNuReport};
@@ -31,6 +32,8 @@ pub struct ValidatorEngine {
     char_rule_indices: Vec<usize>,
     stray_rule_indices: Vec<usize>,
     line_index: LineIndex,
+    /// Kept between documents: its derivative memos are a cache.
+    schema: Option<SchemaValidator>,
 }
 
 impl Default for ValidatorEngine {
@@ -62,6 +65,7 @@ impl ValidatorEngine {
             char_rule_indices,
             stray_rule_indices,
             line_index: LineIndex::default(),
+            schema: None,
         }
     }
 
@@ -98,6 +102,7 @@ impl ValidatorEngine {
                 &self.line_index,
                 char_indices,
                 stray_indices,
+                self.schema.take().unwrap_or_default(),
             )),
         };
 
@@ -113,7 +118,8 @@ impl ValidatorEngine {
         let char_indices = std::mem::take(&mut inner.char_rule_indices);
         let stray_indices = std::mem::take(&mut inner.stray_rule_indices);
         let halted_at = inner.halted_at();
-        let (_ctx, rules, messages, mut scan_policy) = inner.finish();
+        let (_ctx, rules, messages, mut scan_policy, schema) = inner.finish();
+        self.schema = Some(schema);
         scan_policy
             .tracker
             .check_raw_script_step(is_script_step, html);
