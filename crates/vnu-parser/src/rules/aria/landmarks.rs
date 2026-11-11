@@ -18,24 +18,8 @@ pub fn validate_landmarks_and_counts(
     state: &mut AriaMiscState,
     msgs: &mut Vec<VNuMessage>,
 ) {
-    if roles.len() > 1 {
-        for r in roles {
-            if *r == "input" {
-                msgs.push(VNuMessage::error(
-                    "Discarding unrecognized token “input” from value of attribute “role”. Browsers ignore any token that is not a defined ARIA non-abstract role.",
-                    tag.line,
-                    tag.col,
-                ));
-            }
-        }
-        if roles == ["button", "link"] {
-            msgs.push(VNuMessage::info(
-                "Discarding superfluous token “link” from value of attribute “role”. Browsers only process the first token found that is a defined ARIA non-abstract role.",
-                tag.line,
-                tag.col,
-            ));
-        }
-    }
+    // "Discarding unrecognized/superfluous token" come from the schema adapter
+    // (RoleAttributeFilteringContentHandlerWrapper).
 
     // Main element tracking
     let is_hidden = tag.has_attr("hidden");

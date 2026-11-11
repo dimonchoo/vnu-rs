@@ -96,7 +96,7 @@ impl Rule for ObsoleteRule {
             ));
         }
 
-        for (attr_name, _) in &tag.attrs {
+        for (attr_name, _) in tag.attrs.iter() {
             let attr_lower = attr_name.to_ascii_lowercase();
             if attr_lower == "contextmenu" {
                 msgs.push(VNuMessage::error(

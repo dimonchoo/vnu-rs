@@ -86,7 +86,7 @@ impl Rule for InputRule {
         }
 
         // 2. Attribute-level restrictions
-        for (attr, _) in &tag.attrs {
+        for (attr, _) in tag.attrs.iter() {
             let attr_lower = attr.to_ascii_lowercase();
 
             // Layer 1 overrides
@@ -157,7 +157,7 @@ impl Rule for InputRule {
 
         // Hidden input must not have aria-* attributes
         if effective_type == "hidden" {
-            for (attr, _) in &tag.attrs {
+            for (attr, _) in tag.attrs.iter() {
                 if attr.starts_with("aria-") {
                     msgs.push(VNuMessage::error(
                         "An “input” element with a “type” attribute whose value is “hidden” must not have any “aria-*” attributes.".to_string(),

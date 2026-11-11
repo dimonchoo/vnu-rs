@@ -1,17 +1,74 @@
 pub mod context;
 pub mod engine;
+pub mod quotes;
 pub mod rule;
 pub mod rules;
 pub mod schema;
 pub mod syntax;
+pub mod treebuilder;
 
 pub use context::{ElementContext, LineIndex, SourceLocation, ValidationContext};
-pub use engine::ValidatorEngine;
+pub use engine::{CheckMode, ValidatorEngine};
 pub use rule::Rule;
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn script_source_is_not_reported_as_broken_tags() {
+        let mut engine = ValidatorEngine::default();
+        let html = "<!DOCTYPE html><html lang=\"en\"><head><title>T</title></head><body>\
+<div data-noptimize=\"1\"><script>if (a < b) { console.log(\"x\"); }</script></div>\
+</body></html>";
+        let report = engine.validate(html);
+        let false_syntax: Vec<_> = report
+            .messages
+            .iter()
+            .filter(|m| {
+                m.message.contains("Quote “\"” in attribute name")
+                    || m.message.contains("slash was not immediately followed")
+                    || m.message.contains("expecting an attribute name")
+            })
+            .map(|m| m.message.clone())
+            .collect();
+        assert!(
+            false_syntax.is_empty(),
+            "script source was parsed as tags: {false_syntax:?}"
+        );
+    }
+
+    #[test]
+    fn real_tag_syntax_errors_are_still_reported() {
+        let mut engine = ValidatorEngine::default();
+        let html = "<!DOCTYPE html><html lang=\"en\"><head><title>T</title></head><body>\
+<div / class=\"a\"></div></body></html>";
+        let report = engine.validate(html);
+        assert!(
+            report
+                .messages
+                .iter()
+                .any(|m| m.message.contains("slash was not immediately followed")),
+            "messages: {:?}",
+            report.messages
+        );
+    }
+
+    #[test]
+    fn trailing_slash_points_at_the_void_element() {
+        let mut engine = ValidatorEngine::default();
+        let html = "<!DOCTYPE html><html lang=\"en\"><head><title>T</title><meta name=\"x\" content=\"hello\" /></head><body></body></html>";
+        let report = engine.validate(html);
+        let msg = report
+            .messages
+            .iter()
+            .find(|m| m.message.contains("Trailing slash"))
+            .expect("trailing slash info");
+        assert!(
+            msg.first_column.unwrap_or(1) > 1,
+            "column was not located: {msg:?}"
+        );
+    }
 
     #[test]
     fn test_valid_html() {
@@ -133,11 +190,11 @@ mod tests {
         }));
         assert!(report.messages.iter().any(|m| {
             m.message
-                .contains("Element “li” not allowed as child of “body”")
+                .contains("Element “li” not allowed as child of element “body”")
         }));
         assert!(report.messages.iter().any(|m| {
             m.message
-                .contains("Element “source” not allowed as child of “body”")
+                .contains("Element “source” not allowed as child of element “body”")
         }));
     }
 

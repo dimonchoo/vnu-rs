@@ -1,4 +1,6 @@
 use super::body_scope::BodyStyleTracker;
+use crate::context::LineIndex;
+use crate::quotes::quoted_parts;
 use vnu_core::VNuMessage;
 
 struct CssDiagnosticPattern {
@@ -231,5 +233,113 @@ impl CssValidator {
         {
             msgs.push(VNuMessage::error("CSS: “p”: Parse Error.", line, col));
         }
+    }
+
+    pub fn validate_stylesheet(text: &str, lines: &LineIndex) -> Vec<VNuMessage> {
+        let mut msgs = Self::validate(text, false, false, 1, 1);
+        place_stylesheet_spans(text, lines, &mut msgs);
+        msgs
+    }
+}
+
+fn place_stylesheet_spans(text: &str, lines: &LineIndex, msgs: &mut [VNuMessage]) {
+    let mut used: Vec<std::ops::Range<usize>> = Vec::new();
+    for msg in msgs {
+        let Some((start, end)) = find_cause(text, &msg.message, &used) else {
+            continue;
+        };
+        used.push(start..end);
+        let loc = lines.location(start);
+        let last = loc.col + end.saturating_sub(start).saturating_sub(1);
+        msg.first_line = Some(loc.line);
+        msg.last_line = Some(loc.line);
+        msg.first_column = Some(loc.col);
+        msg.last_column = Some(last.max(loc.col));
+    }
+}
+
+fn find_cause(
+    text: &str,
+    message: &str,
+    used: &[std::ops::Range<usize>],
+) -> Option<(usize, usize)> {
+    if message.contains("“p”: Parse Error") {
+        return find_unused(text, "p {", used).map(|start| (start, start + 3));
+    }
+    if message == "CSS: Parse Error." {
+        for needle in [
+            "!important color:",
+            "!important background:",
+            "@position-try foo",
+            "@position-try x",
+            "@position-try",
+            "@media",
+            "{",
+        ] {
+            if let Some(start) = find_unused(text, needle, used) {
+                let len = if needle == "{" { 1 } else { needle.len() };
+                return Some((start, start + len));
+            }
+        }
+    }
+    if message.contains("@charset") {
+        return find_unused(text, "@charset", used).map(|start| (start, start + "@charset".len()));
+    }
+    let mut parts = quoted_parts(message);
+    parts.sort_by_key(|part| std::cmp::Reverse(part.len()));
+    for part in parts {
+        if part.is_empty() {
+            continue;
+        }
+        if let Some(start) = find_unused(text, part, used) {
+            return Some((start, start + part.len()));
+        }
+    }
+    None
+}
+
+fn find_unused(text: &str, needle: &str, used: &[std::ops::Range<usize>]) -> Option<usize> {
+    let mut from = 0;
+    while let Some(rel) = text[from..].find(needle) {
+        let start = from + rel;
+        let end = start + needle.len();
+        let overlaps = used
+            .iter()
+            .any(|range| start < range.end && end > range.start);
+        if !overlaps {
+            return Some(start);
+        }
+        from = start + 1;
+        if from > text.len() {
+            break;
+        }
+    }
+    None
+}
+
+#[cfg(test)]
+mod stylesheet_tests {
+    use super::CssValidator;
+    use crate::context::LineIndex;
+
+    #[test]
+    fn stylesheet_error_is_on_the_property_line() {
+        let css = "p { color: black; }\n.bad { colr: red; }\n";
+        let lines = LineIndex::new(css);
+        let msgs = CssValidator::validate_stylesheet(css, &lines);
+        let msg = msgs
+            .iter()
+            .find(|msg| msg.message.contains("Property “colr”"))
+            .expect("colr diagnostic");
+        assert_eq!(msg.last_line, Some(2));
+        assert_eq!(msg.first_column, Some(8));
+    }
+
+    #[test]
+    fn plain_rule_is_not_an_html_document() {
+        let css = "p { color: black; }\n";
+        let lines = LineIndex::new(css);
+        let msgs = CssValidator::validate_stylesheet(css, &lines);
+        assert!(msgs.is_empty(), "{msgs:?}");
     }
 }

@@ -75,13 +75,6 @@ pub fn handle_picture_open(
             ));
         }
     }
-    if !ctx.body_seen && ctx.is_descendant_of("noscript") {
-        msgs.push(VNuMessage::error(
-            "Bad start tag in “picture” in “noscript” in “head”.",
-            tag.line,
-            tag.col,
-        ));
-    }
     for attr in DISALLOWED_ON_PICTURE {
         if tag.has_attr(attr) {
             msgs.push(VNuMessage::error(

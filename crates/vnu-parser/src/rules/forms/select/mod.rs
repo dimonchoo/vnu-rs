@@ -114,7 +114,11 @@ impl Rule for SelectRule {
                 state.current_option_col = tag.col;
             } else {
                 self.standalone_option_text.clear();
-                self.standalone_option_has_label = has_label;
+                // An option child of datalist may be empty (HTML content model).
+                self.standalone_option_has_label = has_label
+                    || ctx
+                        .parent()
+                        .is_some_and(|p| p.name.eq_ignore_ascii_case("datalist"));
                 self.standalone_option_line = tag.line;
                 self.standalone_option_col = tag.col;
             }

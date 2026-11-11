@@ -1,0 +1,8 @@
+[package]
+name = "vnu-relaxng"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Port of Jing's RELAX NG derivative validator and compact-syntax schema builder"
+
+[dependencies]

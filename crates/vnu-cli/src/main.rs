@@ -1,41 +1,77 @@
 mod filter;
 mod format;
 mod formatter;
+mod inputs;
 mod options;
 mod server;
 mod service;
 
 use filter::{MessageFilterConfig, filter_messages};
-use format::OutputFormat;
-use formatter::format_report;
+use formatter::format_messages;
+use inputs::{document_url, expand_inputs};
 use options::{CliOptions, parse_args, print_help};
 use regex::Regex;
 use std::env;
 use std::fs;
 use std::io::{self, Read, Write};
+use std::path::{Path, PathBuf};
 use std::process;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
-use vnu_parser::ValidatorEngine;
+use vnu_core::VNuMessage;
+use vnu_parser::{CheckMode, ValidatorEngine};
 
-fn should_skip_file(file_path: &str, opts: &CliOptions) -> bool {
-    if file_path == "-" {
-        return false;
-    }
-    let lower = file_path.to_ascii_lowercase();
-    if opts.skip_non_html {
-        return !(lower.ends_with(".html")
-            || lower.ends_with(".htm")
-            || lower.ends_with(".xhtml")
-            || lower.ends_with(".xht"));
-    }
-    if opts.skip_non_svg {
-        return !lower.ends_with(".svg");
+struct FileOutcome {
+    has_errors: bool,
+    has_warnings: bool,
+    messages: Vec<VNuMessage>,
+}
+
+fn ends_with_ignore_ascii_case(path: &str, suffix: &str) -> bool {
+    let start = path.len().saturating_sub(suffix.len());
+    path.is_char_boundary(start) && path[start..].eq_ignore_ascii_case(suffix)
+}
+
+fn select_check(file_path: &str, opts: &CliOptions) -> Option<CheckMode> {
+    let is_css = file_path != "-" && ends_with_ignore_ascii_case(file_path, ".css");
+    let is_svg = file_path != "-" && ends_with_ignore_ascii_case(file_path, ".svg");
+    let is_html = file_path == "-"
+        || ends_with_ignore_ascii_case(file_path, ".html")
+        || ends_with_ignore_ascii_case(file_path, ".htm")
+        || ends_with_ignore_ascii_case(file_path, ".xhtml")
+        || ends_with_ignore_ascii_case(file_path, ".xht");
+
+    // Same priority as upstream vnu: CSS options win over SVG options.
+    if opts.force_css {
+        return Some(CheckMode::Css);
     }
     if opts.skip_non_css {
-        return !lower.ends_with(".css");
+        return is_css.then_some(CheckMode::Css);
     }
-    false
+    if opts.also_check_css && is_css {
+        return Some(CheckMode::Css);
+    }
+    if opts.force_svg {
+        return Some(CheckMode::Svg);
+    }
+    if opts.skip_non_svg {
+        return is_svg.then_some(CheckMode::Svg);
+    }
+    if opts.also_check_svg && is_svg {
+        return Some(CheckMode::Svg);
+    }
+    if opts.skip_non_html && !is_html {
+        return None;
+    }
+    Some(CheckMode::Html)
+}
+
+fn tag_with_url(messages: &mut [VNuMessage], url: &str) {
+    for message in messages {
+        if message.url.is_none() {
+            message.url = Some(url.to_string());
+        }
+    }
 }
 
 fn process_one_file(
@@ -44,56 +80,75 @@ fn process_one_file(
     opts: &CliOptions,
     filter_cfg: &MessageFilterConfig,
     filter_re: Option<&Regex>,
-) -> (bool, bool, Option<String>, Option<String>) {
-    if should_skip_file(file_path, opts) {
-        return (false, false, None, None);
-    }
+    cwd: &Path,
+) -> FileOutcome {
+    let Some(mode) = select_check(file_path, opts) else {
+        return FileOutcome {
+            has_errors: false,
+            has_warnings: false,
+            messages: Vec::new(),
+        };
+    };
 
     if opts.verbose {
-        eprintln!("Checking {}", file_path);
+        eprintln!("Checking {file_path}");
     }
 
+    let url = document_url(file_path, cwd);
     let content = if file_path == "-" {
         let mut buf = String::new();
-        if let Err(e) = io::stdin().read_to_string(&mut buf) {
-            return (
-                true,
-                false,
-                None,
-                Some(format!("Error reading stdin: {}", e)),
-            );
+        if let Err(err) = io::stdin().read_to_string(&mut buf) {
+            return read_error(file_path, &url, err, filter_cfg, filter_re);
         }
         buf
     } else {
         match fs::read_to_string(file_path) {
-            Ok(c) => c,
-            Err(e) => {
-                return (
-                    true,
-                    false,
-                    None,
-                    Some(format!("Error reading {}: {}", file_path, e)),
-                );
-            }
+            Ok(content) => content,
+            Err(err) => return read_error(file_path, &url, err, filter_cfg, filter_re),
         }
     };
 
-    let report = engine.validate(&content);
-    let (filtered, has_errors, has_warnings) = if filter_cfg.is_noop() && filter_re.is_none() {
-        let has_err = !report.is_valid();
-        let has_warn = report.warning_count() > 0;
-        (report.messages, has_err, has_warn)
+    let report = engine.validate_as(&content, mode);
+    let (mut filtered, has_errors, has_warnings) = if filter_cfg.is_noop() && filter_re.is_none() {
+        let has_errors = !report.is_valid();
+        let has_warnings = report.warning_count() > 0;
+        (report.messages, has_errors, has_warnings)
     } else {
         filter_messages(report.messages, filter_cfg, filter_re)
     };
-
-    if filtered.is_empty() && opts.format != OutputFormat::Text {
-        return (has_errors, has_warnings, None, None);
+    tag_with_url(&mut filtered, &url);
+    FileOutcome {
+        has_errors,
+        has_warnings,
+        messages: filtered,
     }
+}
 
-    match format_report(file_path, filtered, opts.format) {
-        Ok(formatted) => (has_errors, has_warnings, Some(formatted), None),
-        Err(err) => (true, has_warnings, None, Some(err)),
+fn read_error(
+    file_path: &str,
+    url: &str,
+    err: impl std::fmt::Display,
+    filter_cfg: &MessageFilterConfig,
+    filter_re: Option<&Regex>,
+) -> FileOutcome {
+    let messages = vec![
+        VNuMessage::non_document_error(format!("Error reading {file_path}: {err}")).with_url(url),
+    ];
+    let (filtered, has_errors, has_warnings) = filter_messages(messages, filter_cfg, filter_re);
+    FileOutcome {
+        has_errors,
+        has_warnings,
+        messages: filtered,
+    }
+}
+
+fn status_code(has_errors: bool, has_warnings: bool, opts: &CliOptions) -> i32 {
+    if opts.exit_zero_always {
+        0
+    } else if has_errors || (opts.werror && has_warnings && !opts.errors_only) {
+        1
+    } else {
+        0
     }
 }
 
@@ -110,9 +165,9 @@ fn main() {
     }
 
     let mut opts = match parse_args(&args) {
-        Ok(o) => o,
-        Err(e) => {
-            eprintln!("Error: {}", e);
+        Ok(opts) => opts,
+        Err(err) => {
+            eprintln!("Error: {err}");
             eprintln!("Run 'vnu --help' for usage details.");
             process::exit(1);
         }
@@ -123,8 +178,8 @@ fn main() {
         return;
     }
 
-    if let Err(e) = opts.load_filter_files() {
-        eprintln!("Error: {}", e);
+    if let Err(err) = opts.load_filter_files() {
+        eprintln!("Error: {err}");
         process::exit(1);
     }
 
@@ -134,10 +189,22 @@ fn main() {
         process::exit(1);
     }
 
+    let cwd = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let files = match expand_inputs(&opts.files) {
+        Ok(files) => files,
+        Err(err) => emit_and_exit(
+            &opts,
+            vec![VNuMessage::non_document_error(err)],
+            true,
+            false,
+        ),
+    };
+    opts.files = files;
+
     let filter_re = match opts.build_filter_regex() {
         Ok(re) => re,
-        Err(e) => {
-            eprintln!("Error: {}", e);
+        Err(err) => {
+            eprintln!("Error: {err}");
             process::exit(1);
         }
     };
@@ -152,34 +219,24 @@ fn main() {
 
     let mut has_errors = false;
     let mut has_warnings = false;
-
-    let write_output = |stdout_msg: Option<String>, stderr_msg: Option<String>| {
-        if let Some(msg) = stderr_msg {
-            eprintln!("{}", msg);
-        }
-        if let Some(msg) = stdout_msg {
-            if opts.stdout {
-                println!("{}", msg);
-            } else {
-                eprintln!("{}", msg);
-            }
-        }
-    };
+    let mut messages = Vec::new();
 
     let enable_langdetect = !opts.no_langdetect;
 
-    if opts.files.len() <= 1 || opts.files.iter().any(|f| f == "-") {
+    if opts.files.len() <= 1 || opts.files.iter().any(|file| file == "-") {
         let mut engine = ValidatorEngine::with_options(enable_langdetect);
         for file_path in &opts.files {
-            let (err, warn, stdout_msg, stderr_msg) =
-                process_one_file(&mut engine, file_path, &opts, filter_cfg_ref, filter_re_ref);
-            if err {
-                has_errors = true;
-            }
-            if warn {
-                has_warnings = true;
-            }
-            write_output(stdout_msg, stderr_msg);
+            let outcome = process_one_file(
+                &mut engine,
+                file_path,
+                &opts,
+                filter_cfg_ref,
+                filter_re_ref,
+                &cwd,
+            );
+            has_errors |= outcome.has_errors;
+            has_warnings |= outcome.has_warnings;
+            messages.extend(outcome.messages);
         }
     } else {
         let worker_count = thread::available_parallelism()
@@ -190,11 +247,12 @@ fn main() {
         let files_ref = &opts.files;
         let next_idx_ref = &next_idx;
         let opts_ref = &opts;
+        let cwd_ref = cwd.as_path();
 
-        let (thread_results, worker_failed) = thread::scope(|s| {
+        let (thread_results, worker_failed) = thread::scope(|scope| {
             let mut handles = Vec::with_capacity(worker_count);
             for _ in 0..worker_count {
-                handles.push(s.spawn(move || {
+                handles.push(scope.spawn(move || {
                     let mut engine = ValidatorEngine::with_options(enable_langdetect);
                     let mut local_out = Vec::new();
                     loop {
@@ -202,22 +260,23 @@ fn main() {
                         if idx >= files_ref.len() {
                             break;
                         }
-                        let res = process_one_file(
+                        let outcome = process_one_file(
                             &mut engine,
                             &files_ref[idx],
                             opts_ref,
                             filter_cfg_ref,
                             filter_re_ref,
+                            cwd_ref,
                         );
-                        local_out.push((idx, res));
+                        local_out.push((idx, outcome));
                     }
                     local_out
                 }));
             }
             let mut combined = Vec::with_capacity(opts.files.len());
             let mut failed = false;
-            for h in handles {
-                match h.join() {
+            for handle in handles {
+                match handle.join() {
                     Ok(batch) => combined.extend(batch),
                     Err(_) => {
                         eprintln!("Error: CLI worker thread failed unexpectedly");
@@ -234,29 +293,46 @@ fn main() {
 
         let mut ordered = thread_results;
         ordered.sort_unstable_by_key(|(idx, _)| *idx);
-        for (_, (err, warn, stdout_msg, stderr_msg)) in ordered {
-            if err {
-                has_errors = true;
-            }
-            if warn {
-                has_warnings = true;
-            }
-            write_output(stdout_msg, stderr_msg);
+        for (_, outcome) in ordered {
+            has_errors |= outcome.has_errors;
+            has_warnings |= outcome.has_warnings;
+            messages.extend(outcome.messages);
         }
     }
 
-    if let Err(e) = io::stdout().flush() {
-        eprintln!("Warning: Failed to flush stdout: {}", e);
-    }
-    if let Err(e) = io::stderr().flush() {
-        eprintln!("Warning: Failed to flush stderr: {}", e);
-    }
-
-    if opts.exit_zero_always {
-        process::exit(0);
-    }
-
-    if has_errors || (opts.werror && has_warnings) {
-        process::exit(1);
-    }
+    emit_and_exit(&opts, messages, has_errors, has_warnings);
 }
+
+fn emit_and_exit(
+    opts: &CliOptions,
+    messages: Vec<VNuMessage>,
+    mut has_errors: bool,
+    has_warnings: bool,
+) -> ! {
+    match format_messages(&messages, opts.format) {
+        Ok(formatted) if !formatted.is_empty() => {
+            if opts.stdout {
+                println!("{formatted}");
+            } else {
+                eprintln!("{formatted}");
+            }
+        }
+        Ok(_) => {}
+        Err(err) => {
+            eprintln!("{err}");
+            has_errors = true;
+        }
+    }
+
+    if let Err(err) = io::stdout().flush() {
+        eprintln!("Warning: Failed to flush stdout: {err}");
+    }
+    if let Err(err) = io::stderr().flush() {
+        eprintln!("Warning: Failed to flush stderr: {err}");
+    }
+
+    process::exit(status_code(has_errors, has_warnings, opts));
+}
+
+#[cfg(test)]
+mod cli_tests;

@@ -25,8 +25,8 @@ pub use content_model::ContentModelRule;
 pub use custom_elements::CustomElementsRule;
 pub use datatypes::DatatypesRule;
 pub use document::{
-    BodyClosedRule, CspRule, DoctypeRule, DuplicateIdRule, HeadTitleRule, HtmlLangRule,
-    MetadataRule, RdfaRule, XmlStylesheetRule,
+    CspRule, DuplicateIdRule, HeadTitleRule, HtmlLangRule, MetadataRule, RdfaRule,
+    XmlStylesheetRule,
 };
 pub use figure::FigureRule;
 pub use foreign::{ForeignMathRule, ForeignSvgRule};
@@ -52,10 +52,7 @@ pub fn default_rules() -> Vec<Box<dyn Rule>> {
 }
 
 pub fn rules_with_options(enable_langdetect: bool) -> Vec<Box<dyn Rule>> {
-    let mut rules: Vec<Box<dyn Rule>> = vec![Box::new(DoctypeRule::default())];
-    if enable_langdetect {
-        rules.push(Box::new(HtmlLangRule::default()));
-    }
+    let mut rules: Vec<Box<dyn Rule>> = vec![Box::new(HtmlLangRule::default())];
     rules.extend(vec![
         Box::new(HeadTitleRule::default()) as Box<dyn Rule>,
         Box::new(ImgAltRule),
@@ -74,7 +71,6 @@ pub fn rules_with_options(enable_langdetect: bool) -> Vec<Box<dyn Rule>> {
         Box::new(LiRule),
         Box::new(MenuRule),
         Box::new(FigureRule::default()),
-        Box::new(BodyClosedRule::default()),
         Box::new(TablesRule::default()),
         Box::new(AriaRule::default()),
         Box::new(ContentModelRule::default()),
@@ -94,4 +90,42 @@ pub fn rules_with_options(enable_langdetect: bool) -> Vec<Box<dyn Rule>> {
     }
     rules.push(Box::new(XmlStylesheetRule));
     rules
+}
+
+#[cfg(test)]
+mod tests {
+    use super::rules_with_options;
+    use crate::engine::ValidatorEngine;
+
+    #[test]
+    fn no_langdetect_keeps_html_lang_and_drops_detector() {
+        let without: Vec<&str> = rules_with_options(false)
+            .iter()
+            .map(|rule| rule.name())
+            .collect();
+        assert!(without.contains(&"html-lang"));
+        assert!(!without.contains(&"langdetect"));
+
+        let with: Vec<&str> = rules_with_options(true)
+            .iter()
+            .map(|rule| rule.name())
+            .collect();
+        assert!(with.contains(&"html-lang"));
+        assert!(with.contains(&"langdetect"));
+    }
+
+    #[test]
+    fn no_langdetect_still_warns_when_html_lang_is_missing() {
+        let mut engine = ValidatorEngine::with_options(false);
+        let report = engine
+            .validate("<!DOCTYPE html><html><head><title>T</title></head><body></body></html>");
+        assert!(
+            report
+                .messages
+                .iter()
+                .any(|message| message.message.contains("lang")),
+            "missing html lang warning should survive --no-langdetect: {:?}",
+            report.messages
+        );
+    }
 }

@@ -89,7 +89,7 @@ impl Rule for CspRule {
             ));
         }
 
-        for (attr_name, _) in &tag.attrs {
+        for (attr_name, _) in tag.attrs.iter() {
             if self.csp_script_src_blocks_inline
                 && attr_name.starts_with("on")
                 && attr_name.len() > 2

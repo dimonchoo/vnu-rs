@@ -3,7 +3,9 @@ use std::fs;
 use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
+use vnu_core::{MessageSubType, MessageType, VNuMessage, VNuReport};
 use vnu_parser::ValidatorEngine;
+use vnu_parser::schema::relaxng::messages::display_wording;
 
 pub struct ThreadBatchResult {
     pub total: usize,
@@ -12,6 +14,78 @@ pub struct ThreadBatchResult {
     pub cat_total: BTreeMap<String, usize>,
     pub cat_match: BTreeMap<String, usize>,
     pub failures: Vec<String>,
+}
+
+/// Upstream TestRunner semantics (strict): a `novalid` file passes when its first error
+/// equals the expected message; a `haswarn` file needs no errors and its first warning
+/// equal; a `hasinfo` file needs no errors or warnings and its first info equal; any
+/// other file must draw no error and no warning. Lenient mode keeps the old
+/// substring-either-way match against any message.
+pub fn case_passes(key: &str, expected: Option<&str>, report: &VNuReport, strict: bool) -> bool {
+    if !strict {
+        return match expected {
+            Some(exp) => {
+                let exp_norm = normalize(exp);
+                report.messages.iter().any(|m| {
+                    let msg_norm = normalize(&m.message);
+                    msg_norm == exp_norm
+                        || msg_norm.contains(&exp_norm)
+                        || exp_norm.contains(&msg_norm)
+                })
+            }
+            None => report.is_valid(),
+        };
+    }
+    // Same message filtering as upstream TestRunner: DEFAULT_FILTER_STRINGS, the XML 1.0
+    // serializability warnings, and the missing-lang warning except in *missing-lang* files.
+    // One pass collects the counts and the first message of each kind.
+    let ignore_missing_lang = !key.contains("missing-lang");
+    let (mut errors, mut warnings) = (0usize, 0usize);
+    let (mut first_error, mut first_warning, mut first_info) = (None, None, None);
+    for m in &report.messages {
+        if upstream_filtered(&m.message, ignore_missing_lang) {
+            continue;
+        }
+        match (m.msg_type, m.sub_type) {
+            (MessageType::Error | MessageType::NonDocumentError, _) => {
+                errors += 1;
+                first_error.get_or_insert(m);
+            }
+            (MessageType::Info, Some(MessageSubType::Warning)) => {
+                warnings += 1;
+                first_warning.get_or_insert(m);
+            }
+            (MessageType::Info, None) => {
+                first_info.get_or_insert(m);
+            }
+            _ => {}
+        }
+    }
+    // TestRunner compares getDisplayMessage(), falling back to getMessage().
+    let first_equals = |m: Option<&VNuMessage>| match (m, expected) {
+        (Some(m), Some(exp)) => normalize(&display_wording(&m.message)) == normalize(exp),
+        _ => false,
+    };
+    if key.contains("novalid") {
+        first_equals(first_error)
+    } else if key.contains("haswarn") {
+        errors == 0 && first_equals(first_warning)
+    } else if key.contains("hasinfo") {
+        errors == 0 && warnings == 0 && first_equals(first_info)
+    } else {
+        errors == 0 && warnings == 0
+    }
+}
+
+fn upstream_filtered(msg: &str, ignore_missing_lang: bool) -> bool {
+    (ignore_missing_lang
+        && msg.starts_with("Consider adding a “lang” attribute to the “html” start tag"))
+        || msg.contains("Authors who wish to regulate nested browsing contexts")
+        || msg.contains("in favour of a new “report-to”")
+        || msg.contains("is only used for backwards compatibility with older CSP")
+        || msg.contains("Property “scale” doesn't exist")
+        || msg.contains("cannot be represented as XML 1.0")
+        || msg.contains("is not serializable as XML 1.0")
 }
 
 fn normalize(s: &str) -> String {
@@ -23,6 +97,7 @@ fn normalize(s: &str) -> String {
 pub fn run_parity_workers(
     all_cases: &[(String, Option<String>)],
     upstream_tests: &Path,
+    strict: bool,
 ) -> Vec<ThreadBatchResult> {
     let worker_count = thread::available_parallelism()
         .map(|n| n.get())
@@ -67,18 +142,7 @@ pub fn run_parity_workers(
                     *local_cat_total.entry(cat.clone()).or_default() += 1;
 
                     let report = engine.validate(&src);
-                    let found = match exp_opt {
-                        Some(exp) => {
-                            let exp_norm = normalize(exp);
-                            report.messages.iter().any(|m| {
-                                let msg_norm = normalize(&m.message);
-                                msg_norm == exp_norm
-                                    || msg_norm.contains(&exp_norm)
-                                    || exp_norm.contains(&msg_norm)
-                            })
-                        }
-                        None => report.is_valid(),
-                    };
+                    let found = case_passes(key, exp_opt.as_deref(), &report, strict);
 
                     if found {
                         local_matches += 1;

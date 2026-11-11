@@ -7,6 +7,9 @@ use vnu_core::VNuMessage;
 pub struct HtmlLangRule {
     html_lang_seen: bool,
     warning_emitted: bool,
+    /// Start of an `html` element without `lang`; reported at the end of the document,
+    /// like Java's LanguageDetectingChecker.
+    html_without_lang: Option<(usize, usize)>,
 }
 
 impl Rule for HtmlLangRule {
@@ -17,6 +20,7 @@ impl Rule for HtmlLangRule {
     fn reset(&mut self) {
         self.html_lang_seen = false;
         self.warning_emitted = false;
+        self.html_without_lang = None;
     }
 
     fn on_start_tag(&mut self, ctx: &ValidationContext, tag: &ElementContext) -> Vec<VNuMessage> {
@@ -54,26 +58,25 @@ impl Rule for HtmlLangRule {
         if tag.name.eq_ignore_ascii_case("html") {
             if tag.has_attr("lang") {
                 self.html_lang_seen = true;
-            } else if !self.warning_emitted {
-                msgs.push(VNuMessage::warning(
-                    "Consider adding a “lang” attribute to the “html” start tag to declare the language of this document.",
-                    tag.line,
-                    tag.col,
-                ));
-                self.warning_emitted = true;
+            } else if self.html_without_lang.is_none() {
+                self.html_without_lang = Some((tag.line, tag.col));
             }
         }
 
         msgs
     }
 
-    fn on_finish(&mut self, _ctx: &ValidationContext) -> Vec<VNuMessage> {
+    fn on_finish(&mut self, ctx: &ValidationContext) -> Vec<VNuMessage> {
         let mut msgs = Vec::new();
+        if ctx.mode == crate::context::DocumentMode::Svg {
+            return msgs;
+        }
         if !self.html_lang_seen && !self.warning_emitted {
+            let (line, col) = self.html_without_lang.unwrap_or((1, 1));
             msgs.push(VNuMessage::warning(
                 "Consider adding a “lang” attribute to the “html” start tag to declare the language of this document.",
-                1,
-                1,
+                line,
+                col,
             ));
             self.warning_emitted = true;
         }

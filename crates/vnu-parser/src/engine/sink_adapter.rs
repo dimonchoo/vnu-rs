@@ -1,5 +1,6 @@
 use super::dispatch::StreamingValidator;
 use crate::context::DocumentMode;
+use crate::treebuilder::TokenizerState;
 use html5ever::tokenizer::states::RawKind;
 use html5ever::tokenizer::{TagKind, Token, TokenSink, TokenSinkResult};
 use std::cell::RefCell;
@@ -11,8 +12,12 @@ pub struct StreamingSink<'a> {
 impl<'a> TokenSink for StreamingSink<'a> {
     type Handle = ();
 
+    fn adjusted_current_node_present_but_not_in_html_namespace(&self) -> bool {
+        self.inner.borrow().in_foreign_content()
+    }
+
     fn process_token(&self, token: Token, line_number: u64) -> TokenSinkResult<()> {
-        let raw_kind = match &token {
+        let mut raw_kind = match &token {
             Token::TagToken(tag) if tag.kind == TagKind::StartTag && !tag.self_closing => {
                 let n = tag.name.as_ref();
                 if n.eq_ignore_ascii_case("script") {
@@ -44,7 +49,9 @@ impl<'a> TokenSink for StreamingSink<'a> {
         let line = line_number as usize;
         match token {
             Token::DoctypeToken(d) => {
-                self.inner.borrow_mut().on_doctype(d, line);
+                let mut inner = self.inner.borrow_mut();
+                let col = inner.column_for_marker(line, "<!");
+                inner.on_doctype(d, line, col);
             }
             Token::TagToken(tag) => match tag.kind {
                 TagKind::StartTag => {
@@ -55,13 +62,32 @@ impl<'a> TokenSink for StreamingSink<'a> {
                         .collect();
 
                     let mut inner = self.inner.borrow_mut();
+                    let col = inner.column_for_tag(line, tag.name.as_ref(), false);
                     inner.normalizer.normalize_attributes(line, &mut attrs);
-                    inner.on_start_tag(tag.name.to_string(), attrs, tag.self_closing, line, 1);
+                    let state = inner.on_start_tag(
+                        tag.name.to_string(),
+                        attrs,
+                        tag.self_closing,
+                        line,
+                        col,
+                    );
+                    // The tree builder knows the insertion mode and namespace, so its
+                    // choice replaces the name-based guess above.
+                    if inner.tree_active() {
+                        raw_kind = state.map(|s| match s {
+                            TokenizerState::Rcdata => TokenSinkResult::RawData(RawKind::Rcdata),
+                            TokenizerState::Rawtext => TokenSinkResult::RawData(RawKind::Rawtext),
+                            TokenizerState::ScriptData => {
+                                TokenSinkResult::RawData(RawKind::ScriptData)
+                            }
+                            TokenizerState::Plaintext => TokenSinkResult::Plaintext,
+                        });
+                    }
                 }
                 TagKind::EndTag => {
-                    self.inner
-                        .borrow_mut()
-                        .on_end_tag(tag.name.as_ref(), line, 1);
+                    let mut inner = self.inner.borrow_mut();
+                    let col = inner.column_for_tag(line, tag.name.as_ref(), true);
+                    inner.on_end_tag(tag.name.as_ref(), line, col);
                 }
             },
             Token::CharacterTokens(text) => {

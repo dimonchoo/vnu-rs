@@ -111,18 +111,82 @@ pub fn scan_syntax(src: &str, msgs: &mut Vec<VNuMessage>) {
                 }
             }
 
-            let advanced = tags::handle_tag_open(bytes, i, src, msgs);
-            i += advanced.max(1);
+            let advanced = tags::handle_tag_open(bytes, i, src, msgs).max(1);
+            if let Some(name) = raw_text_start_tag(bytes, i) {
+                // Script and style source is not markup. A "<" inside it is not a tag.
+                i = raw_element_end(bytes, i + advanced, name);
+                continue;
+            }
+            i += advanced;
             continue;
         }
 
         i += 1;
     }
 
-    if doctype_count > 1 {
-        msgs.push(VNuMessage::error("Stray doctype.".to_string(), 1, 1));
-    }
-
     // End-of-file checks
     eof::check_eof(src, open_comments, close_comments, msgs);
+}
+
+const RAW_TEXT_ELEMENTS: [&str; 9] = [
+    "script",
+    "style",
+    "iframe",
+    "xmp",
+    "noembed",
+    "noframes",
+    "textarea",
+    "title",
+    "plaintext",
+];
+
+/// Name of the raw text element whose start tag begins at `idx`, without allocating.
+fn raw_text_start_tag(bytes: &[u8], idx: usize) -> Option<&'static str> {
+    if bytes.get(idx) != Some(&b'<') {
+        return None;
+    }
+    let start = idx + 1;
+    let mut j = start;
+    while j < bytes.len()
+        && (bytes[j].is_ascii_alphanumeric() || bytes[j] == b'-' || bytes[j] == b':')
+    {
+        j += 1;
+    }
+    let name = &bytes[start..j];
+    if name.is_empty() || !name[0].is_ascii_alphabetic() {
+        return None;
+    }
+    RAW_TEXT_ELEMENTS
+        .into_iter()
+        .find(|el| el.as_bytes().eq_ignore_ascii_case(name))
+}
+
+/// Index just after the matching end tag. Raw text runs to EOF when the end tag is missing.
+fn raw_element_end(bytes: &[u8], content_at: usize, name: &str) -> usize {
+    if name == "plaintext" || content_at >= bytes.len() {
+        return bytes.len();
+    }
+    let name_bytes = name.as_bytes();
+    let mut i = content_at;
+    while i + 2 + name_bytes.len() <= bytes.len() {
+        if bytes[i] == b'<'
+            && bytes[i + 1] == b'/'
+            && bytes[i + 2..i + 2 + name_bytes.len()].eq_ignore_ascii_case(name_bytes)
+        {
+            let after = i + 2 + name_bytes.len();
+            let boundary = after >= bytes.len()
+                || bytes[after].is_ascii_whitespace()
+                || bytes[after] == b'>'
+                || bytes[after] == b'/';
+            if boundary {
+                return bytes[after..]
+                    .iter()
+                    .position(|byte| *byte == b'>')
+                    .map(|rel| after + rel + 1)
+                    .unwrap_or(bytes.len());
+            }
+        }
+        i += 1;
+    }
+    bytes.len()
 }

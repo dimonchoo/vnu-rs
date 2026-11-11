@@ -249,7 +249,7 @@ pub fn validate_attributes(tag: &ElementContext, elem_name: &str, msgs: &mut Vec
     }
 
     const NO_ARIA_ELEMENTS: &[&str] = &["meta", "base", "head", "html"];
-    for (attr_name, _) in &tag.attrs {
+    for (attr_name, _) in tag.attrs.iter() {
         if attr_name.starts_with("aria-")
             && (NO_ARIA_ELEMENTS
                 .iter()

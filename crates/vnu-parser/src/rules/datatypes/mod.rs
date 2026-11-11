@@ -2,7 +2,7 @@ pub mod element_attrs;
 pub mod element_datatypes;
 pub mod media_query;
 pub mod microdata;
-pub mod mime;
+pub use crate::schema::relaxng::datatypes::mime;
 pub mod temporal;
 pub mod tokens;
 pub mod urls;
@@ -160,7 +160,7 @@ impl Rule for DatatypesRule {
 
         validate_element_attributes(tag, &el, &mut msgs);
 
-        for (attr_name, _) in &tag.attrs {
+        for (attr_name, _) in tag.attrs.iter() {
             if attr_name == "data-" {
                 msgs.push(VNuMessage::error(
                     format!(

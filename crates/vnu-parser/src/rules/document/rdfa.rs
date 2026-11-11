@@ -48,14 +48,16 @@ impl Rule for RdfaRule {
             ));
         }
 
-        // 4. xmlns:* declarations in HTML (outside svg/math and XHTML)
-        if el != "svg"
+        // 4. xmlns:* declarations in XHTML-ish documents; with HTML parsing the tree
+        //    builder's checkAttributes reports them.
+        if !ctx.html_parser
+            && el != "svg"
             && el != "math"
             && !ctx.is_descendant_of("svg")
             && !ctx.is_descendant_of("math")
             && !ctx.is_xhtml
         {
-            for (attr_name, _) in &tag.attrs {
+            for (attr_name, _) in tag.attrs.iter() {
                 let attr_lower = attr_name.to_ascii_lowercase();
                 if attr_lower.starts_with("xmlns:") {
                     msgs.push(VNuMessage::error(

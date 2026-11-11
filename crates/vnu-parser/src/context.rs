@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SourceLocation {
     pub line: usize,
@@ -71,7 +73,8 @@ impl LineIndex {
 #[derive(Debug, Clone)]
 pub struct ElementContext {
     pub name: String,
-    pub attrs: Vec<(String, String)>,
+    /// Shared with the tree builder, which keeps the attributes of open elements.
+    pub attrs: Rc<[(String, String)]>,
     pub line: usize,
     pub col: usize,
     pub byte_offset: usize,
@@ -114,6 +117,9 @@ pub struct ValidationContext<'a> {
     pub title_seen: bool,
     pub body_seen: bool,
     pub is_xhtml: bool,
+    /// True when the document goes through the HTML tree builder (not XHTML or SVG,
+    /// which Java parses as XML).
+    pub html_parser: bool,
     pub id_to_tag: std::collections::HashMap<String, String>,
     pub line_index: Option<&'a LineIndex>,
 }
@@ -132,6 +138,7 @@ impl<'a> ValidationContext<'a> {
             title_seen: false,
             body_seen: false,
             is_xhtml,
+            html_parser: false,
             id_to_tag: std::collections::HashMap::new(),
             line_index: None,
         }

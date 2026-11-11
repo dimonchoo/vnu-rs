@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "crates/vnu-core",
+    "crates/vnu-relaxng",
     "crates/vnu-parser",
     "crates/vnu-oracle",
     "crates/vnu-cli",

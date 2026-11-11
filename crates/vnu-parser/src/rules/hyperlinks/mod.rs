@@ -66,7 +66,7 @@ impl Rule for HyperlinksRule {
         }
 
         if name_lower == "a" && !ctx.is_descendant_of("svg") {
-            for (attr, _) in &tag.attrs {
+            for (attr, _) in tag.attrs.iter() {
                 let attr_lower = attr.to_ascii_lowercase();
                 if !crate::rules::forms::input::allowed::is_global_or_common_attr(&attr_lower)
                     && !matches!(

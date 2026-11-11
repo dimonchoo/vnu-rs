@@ -57,17 +57,6 @@ impl Rule for TablesRule {
             if let Some(id) = tag.get_attr("id") {
                 self.model.enter_th_id(id);
             }
-        } else if name_lower == "input"
-            && ctx
-                .open_elements
-                .last()
-                .is_some_and(|top| top.name.eq_ignore_ascii_case("table"))
-        {
-            msgs.push(VNuMessage::error(
-                "Start tag “input” seen in “table”.",
-                tag.line,
-                tag.col,
-            ));
         }
 
         if name_lower == "col" || name_lower == "colgroup" {
@@ -75,7 +64,7 @@ impl Rule for TablesRule {
         } else if matches!(name_lower.as_str(), "thead" | "tbody" | "tfoot") {
             self.model.enter_row_group(&name_lower);
         } else if name_lower == "tr" {
-            self.validate_tr_start(ctx, tag, &mut msgs);
+            self.validate_tr_start(ctx);
         } else if name_lower == "td" || name_lower == "th" {
             self.validate_cell_start(ctx, tag, &name_lower, &mut msgs);
         }
@@ -169,12 +158,7 @@ impl TablesRule {
         }
     }
 
-    fn validate_tr_start(
-        &mut self,
-        ctx: &ValidationContext,
-        tag: &ElementContext,
-        msgs: &mut Vec<VNuMessage>,
-    ) {
+    fn validate_tr_start(&mut self, ctx: &ValidationContext) {
         let parent_is_table_section = ctx
             .parent()
             .map(|p| {
@@ -183,13 +167,7 @@ impl TablesRule {
             })
             .unwrap_or(false);
 
-        if !parent_is_table_section {
-            msgs.push(VNuMessage::error(
-                "Stray start tag “tr”.",
-                tag.line,
-                tag.col,
-            ));
-        } else {
+        if parent_is_table_section {
             let auto_tbody = ctx.mode == crate::context::DocumentMode::Html && !ctx.is_xhtml;
             self.model.enter_tr(auto_tbody);
         }
@@ -202,26 +180,6 @@ impl TablesRule {
         name_lower: &str,
         msgs: &mut Vec<VNuMessage>,
     ) {
-        let parent_is_tr = ctx
-            .parent()
-            .map(|p| p.name.eq_ignore_ascii_case("tr"))
-            .unwrap_or(false);
-        if !parent_is_tr {
-            if ctx.is_descendant_of("table") {
-                msgs.push(VNuMessage::error(
-                    format!("“{}” start tag in table body.", name_lower),
-                    tag.line,
-                    tag.col,
-                ));
-            } else {
-                msgs.push(VNuMessage::error(
-                    format!("Stray start tag “{}”.", name_lower),
-                    tag.line,
-                    tag.col,
-                ));
-            }
-        }
-
         let colspan = tag
             .get_attr("colspan")
             .and_then(|cs| cs.trim().parse::<usize>().ok())
