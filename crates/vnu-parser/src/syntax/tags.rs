@@ -55,12 +55,17 @@ pub fn handle_tag_open(bytes: &[u8], idx: usize, src: &str, msgs: &mut Vec<VNuMe
         ));
     }
 
-    if !next.is_ascii_alphabetic() && next != b'!' && !next.is_ascii_whitespace() {
+    // "a < b" is text, not a tag. Scanning until the next ">" invents quote errors.
+    if next.is_ascii_whitespace() {
+        return 1;
+    }
+    if !next.is_ascii_alphabetic() && next != b'!' {
         msgs.push(VNuMessage::error(
             format!("Bad character “{}” after “<”. Probable cause: Unescaped “<”. Try escaping it as “&lt;”.", next as char),
             1,
             1,
         ));
+        return 2;
     }
 
     scan_start_tag(bytes, idx, src, msgs)

@@ -30,10 +30,7 @@ impl SyntaxTracker {
             self.needs_scan = true;
             return;
         }
-        if attrs.iter().any(|(k, _)| k.starts_with("data-")) {
-            self.needs_scan = true;
-            return;
-        }
+        // data-* is normal HTML. It is not a reason to rescan the whole document.
         for (_, val) in attrs {
             let b = val.as_bytes();
             if b.starts_with(b"=") || b.contains(&b'`') || b.contains(&b'<') || b.contains(&b'"') {

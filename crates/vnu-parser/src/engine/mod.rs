@@ -156,24 +156,45 @@ impl ValidatorEngine {
             if let Some(l) = msg.last_line {
                 let snippet = self.line_index.line_snippet(source, l);
                 if !snippet.is_empty() {
-                    let truncated = if snippet.len() > 120 {
-                        let mut end = 120;
-                        while end > 0 && !snippet.is_char_boundary(end) {
-                            end -= 1;
-                        }
-                        &snippet[..end]
-                    } else {
-                        snippet
-                    };
-                    // Minified lines are not scanned; tokenizer columns stay.
                     if snippet.len() <= 512 {
+                        let truncated = truncate_snippet(snippet, 120);
                         apply_highlight(snippet, truncated, msg);
+                        msg.extract = Some(truncated.to_string());
+                    } else {
+                        // Highlighting searches for the first match on the line, which is
+                        // the wrong tag when a minified line has many copies. Keep the
+                        // column from the tag cursor and show the bytes around it.
+                        let column = msg.first_column.unwrap_or(1);
+                        msg.extract = Some(window_around(snippet, column));
                     }
-                    msg.extract = Some(truncated.to_string());
                 }
             }
         }
     }
+}
+
+fn truncate_snippet(snippet: &str, max_bytes: usize) -> &str {
+    if snippet.len() <= max_bytes {
+        return snippet;
+    }
+    let mut end = max_bytes;
+    while end > 0 && !snippet.is_char_boundary(end) {
+        end -= 1;
+    }
+    &snippet[..end]
+}
+
+fn window_around(snippet: &str, column: usize) -> String {
+    let center = column.saturating_sub(1).min(snippet.len());
+    let mut start = center.saturating_sub(40);
+    while start > 0 && !snippet.is_char_boundary(start) {
+        start -= 1;
+    }
+    let mut end = (center + 80).min(snippet.len());
+    while end < snippet.len() && !snippet.is_char_boundary(end) {
+        end += 1;
+    }
+    snippet[start..end].to_string()
 }
 
 fn root_element_name(text: &str) -> Option<&str> {
