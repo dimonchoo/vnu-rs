@@ -131,19 +131,18 @@ impl Rule for NestingRule {
             msgs.push(VNuMessage::error(msg, tag.line, tag.col));
         }
 
+        // Assertions.startElement: one error per prohibited ancestor, innermost first.
         if name_lower == "main" {
             for ancestor in ctx.open_elements.iter().rev() {
-                let a = ancestor.name.to_ascii_lowercase();
-                if matches!(
-                    a.as_str(),
-                    "article" | "aside" | "footer" | "header" | "nav"
-                ) {
+                let a = ancestor.name.as_str();
+                if PROHIBITED_MAIN_ANCESTORS.binary_search(&a).is_ok() {
                     msgs.push(VNuMessage::error(
-                        format!("The “main” element must not appear as a descendant of the “{}” element.", a),
+                        format!(
+                            "The “main” element must not appear as a descendant of the “{a}” element."
+                        ),
                         tag.line,
                         tag.col,
                     ));
-                    break;
                 }
             }
         }
@@ -171,3 +170,36 @@ impl Rule for NestingRule {
         msgs
     }
 }
+
+/// `Assertions.PROHIBITED_MAIN_ANCESTORS` (sorted).
+const PROHIBITED_MAIN_ANCESTORS: &[&str] = &[
+    "a",
+    "address",
+    "article",
+    "aside",
+    "audio",
+    "blockquote",
+    "canvas",
+    "caption",
+    "dd",
+    "del",
+    "details",
+    "dialog",
+    "dt",
+    "fieldset",
+    "figure",
+    "footer",
+    "header",
+    "ins",
+    "li",
+    "main",
+    "map",
+    "nav",
+    "noscript",
+    "object",
+    "section",
+    "slot",
+    "td",
+    "th",
+    "video",
+];

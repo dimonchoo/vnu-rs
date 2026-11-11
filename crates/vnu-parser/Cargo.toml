@@ -13,5 +13,7 @@ thiserror.workspace = true
 html5ever.workspace = true
 tendril.workspace = true
 unicode-normalization = "0.1"
+vnu-relaxng = { path = "../vnu-relaxng" }
 
-
+[build-dependencies]
+vnu-relaxng = { path = "../vnu-relaxng" }

@@ -2,7 +2,7 @@ pub mod element_attrs;
 pub mod element_datatypes;
 pub mod media_query;
 pub mod microdata;
-pub mod mime;
+pub use crate::schema::relaxng::datatypes::mime;
 pub mod temporal;
 pub mod tokens;
 pub mod urls;

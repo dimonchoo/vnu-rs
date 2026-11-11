@@ -3,6 +3,8 @@ use crate::engine::html_stack::{apply_implicit_closures, ensure_in_body_for_tag,
 use crate::engine::scan_policy::ScanPolicy;
 use crate::engine::tree_adapter::TreeAdapter;
 use crate::rule::Rule;
+use crate::schema::relaxng::SchemaValidator;
+use crate::schema::relaxng::messages::display_wording;
 use crate::treebuilder::{TokenizerState, TreeEvent};
 use html5ever::tokenizer::Doctype;
 use std::borrow::Cow;
@@ -25,6 +27,8 @@ pub struct StreamingValidator<'a> {
     /// Tree construction and its parse errors, like nu htmlparser.
     tree: TreeAdapter,
     tree_events: Vec<TreeEvent>,
+    /// RELAX NG validation of the tree the builder emits, like Jing behind v.Nu.
+    pub schema: SchemaValidator,
 }
 
 impl<'a> StreamingValidator<'a> {
@@ -34,7 +38,9 @@ impl<'a> StreamingValidator<'a> {
         line_index: &'a LineIndex,
         char_rule_indices: Vec<usize>,
         stray_rule_indices: Vec<usize>,
+        mut schema: SchemaValidator,
     ) -> Self {
+        schema.reset();
         let mut ctx = ValidationContext::new(source);
         ctx.line_index = Some(line_index);
         let normalizer = super::attribute_normalization::XhtmlAttributeNormalizer::build(source);
@@ -53,6 +59,7 @@ impl<'a> StreamingValidator<'a> {
             tag_cursor_byte: 0,
             tree: TreeAdapter::default(),
             tree_events: Vec::new(),
+            schema,
         }
     }
 
@@ -93,12 +100,23 @@ impl<'a> StreamingValidator<'a> {
         for event in events.drain(..) {
             match event {
                 TreeEvent::Push {
+                    ns,
                     name,
                     attrs,
                     line: start_line,
                     col: start_col,
-                    ..
                 } => {
+                    // Jing runs before the checkers on every event.
+                    let schema_from = self.messages.len();
+                    self.schema.start_element(
+                        ns,
+                        &name,
+                        &attrs,
+                        start_line,
+                        start_col,
+                        &mut self.messages,
+                    );
+                    let rules_from = self.messages.len();
                     let elem = ElementContext {
                         name: name.into_owned(),
                         attrs,
@@ -116,13 +134,19 @@ impl<'a> StreamingValidator<'a> {
                             self.messages.extend(rule.on_start_tag(&self.ctx, &elem));
                         }
                     }
+                    drop_duplicates(&mut self.messages, schema_from, rules_from);
                     self.ctx.open_elements.push(elem);
                 }
-                TreeEvent::Pop { name, .. } => {
+                TreeEvent::Pop { ns, name } => {
+                    let schema_from = self.messages.len();
+                    self.schema
+                        .end_element(ns, &name, line, col, &mut self.messages);
+                    let rules_from = self.messages.len();
                     for rule in &mut self.rules {
                         self.messages
                             .extend(rule.on_end_tag(&self.ctx, &name, line, col));
                     }
+                    drop_duplicates(&mut self.messages, schema_from, rules_from);
                     self.ctx.open_elements.pop();
                 }
             }
@@ -211,6 +235,7 @@ impl<'a> StreamingValidator<'a> {
                 || (name_str.eq_ignore_ascii_case("html")
                     && elem.has_attr_val("xmlns", "http://www.w3.org/1999/xhtml"));
             self.tree.decide(xml, &mut self.messages);
+            self.ctx.html_parser = self.tree.active();
             if elem.has_attr_val("xmlns", "http://www.w3.org/1999/xhtml")
                 && !name_str.eq_ignore_ascii_case("html")
             {
@@ -363,6 +388,9 @@ impl<'a> StreamingValidator<'a> {
         if self.halted() {
             return;
         }
+        if self.tree.active() {
+            self.schema.characters(text, line, 1);
+        }
         self.scan_policy
             .tracker
             .on_characters(text, self.in_script_or_style);
@@ -377,6 +405,9 @@ impl<'a> StreamingValidator<'a> {
 
     pub fn on_comment(&mut self, _comment: &str, _line: usize, _col: usize) {
         self.tree.comment();
+        if !self.halted() {
+            self.schema.flush_characters(&mut self.messages);
+        }
     }
 
     pub fn on_null_character(&mut self, _line: usize, _col: usize) {}
@@ -408,6 +439,7 @@ impl<'a> StreamingValidator<'a> {
         Vec<Box<dyn Rule>>,
         Vec<VNuMessage>,
         ScanPolicy,
+        SchemaValidator,
     ) {
         let end = self.line_index.location(self.ctx.source.len());
         self.tree.eof(end.line, end.col, &mut self.messages);
@@ -437,6 +469,34 @@ impl<'a> StreamingValidator<'a> {
             }
         }
 
-        (self.ctx, self.rules, self.messages, self.scan_policy)
+        (
+            self.ctx,
+            self.rules,
+            self.messages,
+            self.scan_policy,
+            self.schema,
+        )
     }
+}
+
+/// Drops the rule messages of one event (`messages[rules_from..]`) that repeat a
+/// schema message of the same event (`messages[schema_from..rules_from]`), in either
+/// of its wordings: the hand-written content-model rules still cover some of what
+/// the schema reports.
+fn drop_duplicates(messages: &mut Vec<VNuMessage>, schema_from: usize, rules_from: usize) {
+    if schema_from == rules_from || rules_from == messages.len() {
+        return;
+    }
+    let mut keep = rules_from;
+    for i in rules_from..messages.len() {
+        let text = messages[i].message.as_str();
+        let dup = messages[schema_from..rules_from]
+            .iter()
+            .any(|m| m.message == text || display_wording(&m.message) == text);
+        if !dup {
+            messages.swap(keep, i);
+            keep += 1;
+        }
+    }
+    messages.truncate(keep);
 }

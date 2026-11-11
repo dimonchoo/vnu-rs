@@ -190,11 +190,11 @@ mod tests {
         }));
         assert!(report.messages.iter().any(|m| {
             m.message
-                .contains("Element “li” not allowed as child of “body”")
+                .contains("Element “li” not allowed as child of element “body”")
         }));
         assert!(report.messages.iter().any(|m| {
             m.message
-                .contains("Element “source” not allowed as child of “body”")
+                .contains("Element “source” not allowed as child of element “body”")
         }));
     }
 

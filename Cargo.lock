@@ -1515,7 +1515,12 @@ dependencies = [
  "thiserror",
  "unicode-normalization",
  "vnu-core",
+ "vnu-relaxng",
 ]
+
+[[package]]
+name = "vnu-relaxng"
+version = "0.1.0"
 
 [[package]]
 name = "want"
