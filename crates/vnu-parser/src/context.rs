@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SourceLocation {
     pub line: usize,
@@ -71,7 +73,8 @@ impl LineIndex {
 #[derive(Debug, Clone)]
 pub struct ElementContext {
     pub name: String,
-    pub attrs: Vec<(String, String)>,
+    /// Shared with the tree builder, which keeps the attributes of open elements.
+    pub attrs: Rc<[(String, String)]>,
     pub line: usize,
     pub col: usize,
     pub byte_offset: usize,

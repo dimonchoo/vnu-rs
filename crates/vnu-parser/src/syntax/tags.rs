@@ -31,19 +31,10 @@ pub fn handle_tag_open(bytes: &[u8], idx: usize, src: &str, msgs: &mut Vec<VNuMe
     }
 
     if next == b'/' {
-        return handle_end_tag(bytes, idx, src, msgs);
+        return handle_end_tag(bytes, idx, msgs);
     }
 
     let rest = &bytes[idx + 1..];
-    if (rest.starts_with(b"image ") || rest.starts_with(b"image>") || rest.starts_with(b"image/"))
-        && memchr::memmem::find(src.as_bytes(), b"<svg").is_none()
-    {
-        msgs.push(VNuMessage::error(
-            "Saw a start tag “image”.".to_string(),
-            1,
-            1,
-        ));
-    }
     if rest.starts_with(b"frameset ")
         || rest.starts_with(b"frameset>")
         || rest.starts_with(b"frameset/")
@@ -71,7 +62,7 @@ pub fn handle_tag_open(bytes: &[u8], idx: usize, src: &str, msgs: &mut Vec<VNuMe
     scan_start_tag(bytes, idx, src, msgs)
 }
 
-fn handle_end_tag(bytes: &[u8], idx: usize, src: &str, msgs: &mut Vec<VNuMessage>) -> usize {
+fn handle_end_tag(bytes: &[u8], idx: usize, msgs: &mut Vec<VNuMessage>) -> usize {
     if idx + 2 >= bytes.len() {
         return 2;
     }
@@ -104,21 +95,6 @@ fn handle_end_tag(bytes: &[u8], idx: usize, src: &str, msgs: &mut Vec<VNuMessage
         if tag_str.split_whitespace().count() > 1 {
             msgs.push(VNuMessage::error(
                 "End tag had attributes.".to_string(),
-                1,
-                1,
-            ));
-        }
-        if tag_str.trim().eq_ignore_ascii_case("br") {
-            msgs.push(VNuMessage::error("End tag “br”.".to_string(), 1, 1));
-        }
-        if (tag_str.trim().eq_ignore_ascii_case("src")
-            || tag_str.trim().eq_ignore_ascii_case("style/")
-            || tag_str.trim().eq_ignore_ascii_case("style"))
-            && src.contains("<script")
-            && !src.contains("</script")
-        {
-            msgs.push(VNuMessage::error(
-                "End of file seen when expecting text or an end tag.".to_string(),
                 1,
                 1,
             ));

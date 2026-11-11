@@ -95,17 +95,6 @@ impl Rule for ForeignMathRule {
                 name_lower.as_str(),
                 "div" | "p" | "span" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "a" | "table"
             );
-            if is_html_tag && !parent_name.eq_ignore_ascii_case("annotation-xml") {
-                msgs.push(VNuMessage::error(
-                    format!(
-                        "HTML start tag “{}” in a foreign namespace context.",
-                        name_lower
-                    ),
-                    tag.line,
-                    tag.col,
-                ));
-            }
-
             // Unknown element
             if !KNOWN_MATHML_ELEMENTS.contains(&name_lower.as_str()) && !is_html_tag {
                 msgs.push(VNuMessage::error(

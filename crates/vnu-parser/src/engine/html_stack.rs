@@ -229,7 +229,7 @@ pub fn ensure_in_body_for_tag(
         ctx.body_seen = true;
         let body_elem = ElementContext {
             name: "body".to_string(),
-            attrs: Vec::new(),
+            attrs: std::rc::Rc::from(Vec::new()),
             line,
             col,
             byte_offset: 0,

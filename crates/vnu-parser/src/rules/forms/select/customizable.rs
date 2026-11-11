@@ -35,7 +35,7 @@ pub fn check_button_in_select(
             tag.col,
         ));
     } else {
-        for (attr_name, _) in &tag.attrs {
+        for (attr_name, _) in tag.attrs.iter() {
             let lower = attr_name.to_ascii_lowercase();
             if lower == "role" || lower.starts_with("aria-") {
                 msgs.push(VNuMessage::error(
@@ -71,7 +71,7 @@ pub fn check_selectedcontent(
     }
 
     if inside_button_in_select {
-        for (attr_name, _) in &tag.attrs {
+        for (attr_name, _) in tag.attrs.iter() {
             let lower = attr_name.to_ascii_lowercase();
             if lower == "role" || lower.starts_with("aria-") {
                 msgs.push(VNuMessage::error(

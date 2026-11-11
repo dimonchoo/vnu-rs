@@ -83,25 +83,6 @@ fn validate_doctype_content(dt_content: &str, msgs: &mut Vec<VNuMessage>) {
     if dt_content.contains("BOGUS") {
         msgs.push(VNuMessage::error("Bogus doctype.".to_string(), 1, 1));
     }
-    if dt_content.contains("HTML 4.01 Transitional//EN")
-        && dt_content.contains("http://www.w3.org/TR/html4/loose.dtd")
-    {
-        msgs.push(VNuMessage::error(
-            "Almost standards mode doctype. Expected “<!DOCTYPE html>”.".to_string(),
-            1,
-            1,
-        ));
-    }
-    if dt_content.contains("HTML 4.0//EN")
-        || dt_content.contains("HTML 4.01//EN")
-        || dt_content.contains("XHTML 1.0")
-    {
-        msgs.push(VNuMessage::error(
-            "Obsolete doctype. Expected “<!DOCTYPE html>”.".to_string(),
-            1,
-            1,
-        ));
-    }
     if dt_content.contains("PUBLIC") && dt_content.trim_end().ends_with("PUBLIC") {
         msgs.push(VNuMessage::error(
             "Expected a public identifier but the doctype ended.".to_string(),

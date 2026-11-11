@@ -124,10 +124,6 @@ pub fn scan_syntax(src: &str, msgs: &mut Vec<VNuMessage>) {
         i += 1;
     }
 
-    if doctype_count > 1 {
-        msgs.push(VNuMessage::error("Stray doctype.".to_string(), 1, 1));
-    }
-
     // End-of-file checks
     eof::check_eof(src, open_comments, close_comments, msgs);
 }

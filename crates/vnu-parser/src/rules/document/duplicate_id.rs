@@ -17,7 +17,11 @@ impl Rule for DuplicateIdRule {
         self.seen.clear();
     }
 
-    fn on_start_tag(&mut self, _ctx: &ValidationContext, tag: &ElementContext) -> Vec<VNuMessage> {
+    fn on_start_tag(&mut self, ctx: &ValidationContext, tag: &ElementContext) -> Vec<VNuMessage> {
+        // HTML documents get this check from the tree builder, like nu htmlparser.
+        if ctx.mode == crate::context::DocumentMode::Html && !ctx.is_xhtml {
+            return vec![];
+        }
         if let Some(id) = tag.get_attr("id") {
             if !id.trim().is_empty() && !self.seen.insert(id.to_string()) {
                 return vec![VNuMessage::error(

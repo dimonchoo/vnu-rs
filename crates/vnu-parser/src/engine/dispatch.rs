@@ -1,9 +1,12 @@
 use crate::context::{DocumentMode, ElementContext, LineIndex, ValidationContext};
 use crate::engine::html_stack::{apply_implicit_closures, ensure_in_body_for_tag, is_void_element};
 use crate::engine::scan_policy::ScanPolicy;
+use crate::engine::tree_adapter::TreeAdapter;
 use crate::rule::Rule;
+use crate::treebuilder::{TokenizerState, TreeEvent};
 use html5ever::tokenizer::Doctype;
 use std::borrow::Cow;
+use std::rc::Rc;
 use vnu_core::{MessageSubType, MessageType, VNuMessage};
 
 pub struct StreamingValidator<'a> {
@@ -19,6 +22,9 @@ pub struct StreamingValidator<'a> {
     pub normalizer: super::attribute_normalization::XhtmlAttributeNormalizer,
     tag_cursor_line: usize,
     tag_cursor_byte: usize,
+    /// Tree construction and its parse errors, like nu htmlparser.
+    tree: TreeAdapter,
+    tree_events: Vec<TreeEvent>,
 }
 
 impl<'a> StreamingValidator<'a> {
@@ -45,7 +51,83 @@ impl<'a> StreamingValidator<'a> {
             normalizer,
             tag_cursor_line: 0,
             tag_cursor_byte: 0,
+            tree: TreeAdapter::default(),
+            tree_events: Vec::new(),
         }
+    }
+
+    /// True while the tree builder reports tree-construction errors.
+    pub fn tree_active(&self) -> bool {
+        self.tree.active()
+    }
+
+    /// True when the current node is foreign, so `<![CDATA[` opens a CDATA section.
+    pub fn in_foreign_content(&self) -> bool {
+        self.tree.in_foreign()
+    }
+
+    fn halted(&self) -> bool {
+        self.tree.halted()
+    }
+
+    /// Byte offset just past the token that stopped the parse ("Cannot recover").
+    pub fn halted_at(&self) -> Option<usize> {
+        let (line, col) = self.tree.halted_at()?;
+        let source = self.ctx.source;
+        let start = (self.line_index.line_offset(line) + col.saturating_sub(1)).min(source.len());
+        Some(
+            source[start..]
+                .find('>')
+                .map(|p| start + p + 1)
+                .unwrap_or(source.len()),
+        )
+    }
+
+    /// Runs the rules on the elements the tree builder pushed and popped, so they see
+    /// the same tree as Java's checkers: implied `html`/`head`/`body`/`tbody`, elements
+    /// closed by optional end tags, nothing for ignored tags. `line`/`col` locate the
+    /// token that closed popped elements.
+    fn replay_tree_events(&mut self, line: usize, col: usize) {
+        let mut events = std::mem::take(&mut self.tree_events);
+        self.tree.take_events(&mut events);
+        for event in events.drain(..) {
+            match event {
+                TreeEvent::Push {
+                    name,
+                    attrs,
+                    line: start_line,
+                    col: start_col,
+                    ..
+                } => {
+                    let elem = ElementContext {
+                        name: name.into_owned(),
+                        attrs,
+                        line: start_line,
+                        col: start_col,
+                        byte_offset: self.line_index.line_offset(start_line),
+                    };
+                    match elem.name.as_str() {
+                        "head" => self.ctx.head_seen = true,
+                        "body" => self.ctx.body_seen = true,
+                        _ => {}
+                    }
+                    for rule in &mut self.rules {
+                        if rule.interested_in_start_tag(&elem) {
+                            self.messages.extend(rule.on_start_tag(&self.ctx, &elem));
+                        }
+                    }
+                    self.ctx.open_elements.push(elem);
+                }
+                TreeEvent::Pop { name, .. } => {
+                    for rule in &mut self.rules {
+                        self.messages
+                            .extend(rule.on_end_tag(&self.ctx, &name, line, col));
+                    }
+                    self.ctx.open_elements.pop();
+                }
+            }
+        }
+        self.tree_events = events;
     }
 
     pub fn column_for_tag(&mut self, line: usize, name: &str, end_tag: bool) -> usize {
@@ -80,6 +162,10 @@ impl<'a> StreamingValidator<'a> {
     }
 
     pub fn on_doctype(&mut self, d: Doctype, line: usize, col: usize) {
+        if self.halted() {
+            return;
+        }
+        self.tree.doctype(&d, line, col, &mut self.messages);
         self.scan_policy
             .tracker
             .on_doctype(&d, self.ctx.doctype_seen);
@@ -98,7 +184,10 @@ impl<'a> StreamingValidator<'a> {
         self_closing: bool,
         line: usize,
         col: usize,
-    ) {
+    ) -> Option<TokenizerState> {
+        if self.halted() {
+            return None;
+        }
         let byte_offset = self.line_index.line_offset(line);
         self.scan_policy
             .tracker
@@ -109,7 +198,7 @@ impl<'a> StreamingValidator<'a> {
 
         let elem = ElementContext {
             name: name_str.clone(),
-            attrs,
+            attrs: Rc::from(attrs),
             line,
             col,
             byte_offset,
@@ -117,6 +206,11 @@ impl<'a> StreamingValidator<'a> {
 
         if !self.first_tag_seen {
             self.first_tag_seen = true;
+            // Java parses XHTML and SVG with an XML parser: no HTML tree construction.
+            let xml = name_str.eq_ignore_ascii_case("svg")
+                || (name_str.eq_ignore_ascii_case("html")
+                    && elem.has_attr_val("xmlns", "http://www.w3.org/1999/xhtml"));
+            self.tree.decide(xml, &mut self.messages);
             if elem.has_attr_val("xmlns", "http://www.w3.org/1999/xhtml")
                 && !name_str.eq_ignore_ascii_case("html")
             {
@@ -173,6 +267,23 @@ impl<'a> StreamingValidator<'a> {
             self.ctx.title_seen = true;
         }
 
+        let state = self.tree.start_tag(
+            &name_str,
+            elem.attrs.clone(),
+            self_closing,
+            line,
+            col,
+            &mut self.messages,
+        );
+        if self.tree.active() {
+            if let Some(id) = elem.get_attr("id") {
+                self.ctx.id_to_tag.insert(id.to_string(), name_str);
+            }
+            self.replay_tree_events(line, col);
+            return if self.halted() { None } else { state };
+        }
+        // XHTML and SVG: the hand-made stack below stands in for the XML parser.
+
         if self.ctx.mode == DocumentMode::Html {
             if let Some(m) = ensure_in_body_for_tag(&mut self.ctx, &name_str, line, col) {
                 self.messages.push(m);
@@ -207,15 +318,29 @@ impl<'a> StreamingValidator<'a> {
             col,
             &mut self.messages,
         );
+        state
     }
 
     pub fn on_end_tag(&mut self, name_str: &str, line: usize, col: usize) {
+        if self.halted() {
+            return;
+        }
+        self.tree.end_tag(name_str, line, col, &mut self.messages);
+        if self.tree.active() {
+            self.replay_tree_events(line, col);
+        }
+        if self.halted() {
+            return;
+        }
         if name_str.eq_ignore_ascii_case("script") || name_str.eq_ignore_ascii_case("style") {
             self.in_script_or_style = false;
         }
         self.scan_policy
             .tracker
             .on_end_tag(name_str, is_void_element(name_str));
+        if self.tree.active() {
+            return;
+        }
         super::stack_policy::handle_end_tag(
             &mut self.ctx,
             &mut self.rules,
@@ -228,6 +353,16 @@ impl<'a> StreamingValidator<'a> {
     }
 
     pub fn on_characters(&mut self, text: &str, line: usize, _col: usize) {
+        if self.halted() {
+            return;
+        }
+        self.tree.characters(text, line, &mut self.messages);
+        if self.tree.active() {
+            self.replay_tree_events(line, 1);
+        }
+        if self.halted() {
+            return;
+        }
         self.scan_policy
             .tracker
             .on_characters(text, self.in_script_or_style);
@@ -240,11 +375,16 @@ impl<'a> StreamingValidator<'a> {
         }
     }
 
-    pub fn on_comment(&mut self, _comment: &str, _line: usize, _col: usize) {}
+    pub fn on_comment(&mut self, _comment: &str, _line: usize, _col: usize) {
+        self.tree.comment();
+    }
 
     pub fn on_null_character(&mut self, _line: usize, _col: usize) {}
 
     pub fn on_parse_error(&mut self, err: Cow<'static, str>, line: usize, _col: usize) {
+        if self.halted() {
+            return;
+        }
         let err_str = err.to_string();
         if self.ctx.is_xhtml
             && (err_str.contains("XML processing instruction in HTML")
@@ -269,8 +409,15 @@ impl<'a> StreamingValidator<'a> {
         Vec<VNuMessage>,
         ScanPolicy,
     ) {
-        for rule in &mut self.rules {
-            self.messages.extend(rule.on_finish(&self.ctx));
+        let end = self.line_index.location(self.ctx.source.len());
+        self.tree.eof(end.line, end.col, &mut self.messages);
+        if self.tree.active() {
+            self.replay_tree_events(end.line, end.col);
+        }
+        if !self.halted() {
+            for rule in &mut self.rules {
+                self.messages.extend(rule.on_finish(&self.ctx));
+            }
         }
 
         if let Some(unclosed) = self.ctx.open_elements.iter().find(|e| {
@@ -281,11 +428,13 @@ impl<'a> StreamingValidator<'a> {
             .any(|&t| t.eq_ignore_ascii_case(&e.name))
         }) {
             self.scan_policy.tracker.needs_scan = true;
-            self.messages.push(VNuMessage::error(
-                "End of file seen and there were open elements.".to_string(),
-                unclosed.line,
-                unclosed.col,
-            ));
+            if !self.tree.active() {
+                self.messages.push(VNuMessage::error(
+                    "End of file seen and there were open elements.".to_string(),
+                    unclosed.line,
+                    unclosed.col,
+                ));
+            }
         }
 
         (self.ctx, self.rules, self.messages, self.scan_policy)

@@ -35,16 +35,6 @@ impl Rule for StyleRule {
         let mut msgs = Vec::new();
         let name_lower = tag.name.to_ascii_lowercase();
 
-        // Check if style between head and body
-        if name_lower == "style" && ctx.head_seen && !ctx.body_seen && !ctx.is_descendant_of("head")
-        {
-            msgs.push(VNuMessage::error(
-                "“style” element between “head” and “body”.",
-                tag.line,
-                tag.col,
-            ));
-        }
-
         // Increment current parent child count
         let parent_child_count = if let Some(count) = self.parent_child_counts.last_mut() {
             let prev = *count;

@@ -29,18 +29,11 @@ impl Rule for FormsRule {
         self.pending_commandfor.clear();
     }
 
-    fn on_start_tag(&mut self, ctx: &ValidationContext, tag: &ElementContext) -> Vec<VNuMessage> {
+    fn on_start_tag(&mut self, _ctx: &ValidationContext, tag: &ElementContext) -> Vec<VNuMessage> {
         let mut msgs = Vec::new();
         let name_lower = tag.name.to_ascii_lowercase();
 
         if name_lower == "form" {
-            if ctx.is_descendant_of("form") {
-                msgs.push(VNuMessage::error(
-                    "Saw a “form” start tag, but there was already an active “form” element. Nested forms are not allowed. Ignoring the tag.",
-                    tag.line,
-                    tag.col,
-                ));
-            }
             if let Some(ac) = tag.get_attr("accept-charset") {
                 if !ac.trim().eq_ignore_ascii_case("utf-8") {
                     msgs.push(VNuMessage::error(

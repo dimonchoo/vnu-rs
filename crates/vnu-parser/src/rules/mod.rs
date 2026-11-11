@@ -25,8 +25,8 @@ pub use content_model::ContentModelRule;
 pub use custom_elements::CustomElementsRule;
 pub use datatypes::DatatypesRule;
 pub use document::{
-    BodyClosedRule, CspRule, DoctypeRule, DuplicateIdRule, HeadTitleRule, HtmlLangRule,
-    MetadataRule, RdfaRule, XmlStylesheetRule,
+    CspRule, DuplicateIdRule, HeadTitleRule, HtmlLangRule, MetadataRule, RdfaRule,
+    XmlStylesheetRule,
 };
 pub use figure::FigureRule;
 pub use foreign::{ForeignMathRule, ForeignSvgRule};
@@ -52,8 +52,7 @@ pub fn default_rules() -> Vec<Box<dyn Rule>> {
 }
 
 pub fn rules_with_options(enable_langdetect: bool) -> Vec<Box<dyn Rule>> {
-    let mut rules: Vec<Box<dyn Rule>> = vec![Box::new(DoctypeRule::default())];
-    rules.push(Box::new(HtmlLangRule::default()));
+    let mut rules: Vec<Box<dyn Rule>> = vec![Box::new(HtmlLangRule::default())];
     rules.extend(vec![
         Box::new(HeadTitleRule::default()) as Box<dyn Rule>,
         Box::new(ImgAltRule),
@@ -72,7 +71,6 @@ pub fn rules_with_options(enable_langdetect: bool) -> Vec<Box<dyn Rule>> {
         Box::new(LiRule),
         Box::new(MenuRule),
         Box::new(FigureRule::default()),
-        Box::new(BodyClosedRule::default()),
         Box::new(TablesRule::default()),
         Box::new(AriaRule::default()),
         Box::new(ContentModelRule::default()),

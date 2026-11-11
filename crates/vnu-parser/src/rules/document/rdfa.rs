@@ -55,7 +55,7 @@ impl Rule for RdfaRule {
             && !ctx.is_descendant_of("math")
             && !ctx.is_xhtml
         {
-            for (attr_name, _) in &tag.attrs {
+            for (attr_name, _) in tag.attrs.iter() {
                 let attr_lower = attr_name.to_ascii_lowercase();
                 if attr_lower.starts_with("xmlns:") {
                     msgs.push(VNuMessage::error(

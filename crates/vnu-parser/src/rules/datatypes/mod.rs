@@ -160,7 +160,7 @@ impl Rule for DatatypesRule {
 
         validate_element_attributes(tag, &el, &mut msgs);
 
-        for (attr_name, _) in &tag.attrs {
+        for (attr_name, _) in tag.attrs.iter() {
             if attr_name == "data-" {
                 msgs.push(VNuMessage::error(
                     format!(

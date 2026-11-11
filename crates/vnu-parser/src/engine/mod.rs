@@ -6,6 +6,7 @@ pub mod scan_policy;
 pub mod sink_adapter;
 pub mod stack_policy;
 pub mod tag_column;
+pub mod tree_adapter;
 
 use self::dispatch::StreamingValidator;
 use self::highlight::apply_highlight;
@@ -111,6 +112,7 @@ impl ValidatorEngine {
         let mut inner = tok.sink.inner.into_inner();
         let char_indices = std::mem::take(&mut inner.char_rule_indices);
         let stray_indices = std::mem::take(&mut inner.stray_rule_indices);
+        let halted_at = inner.halted_at();
         let (_ctx, rules, messages, mut scan_policy) = inner.finish();
         scan_policy
             .tracker
@@ -121,7 +123,12 @@ impl ValidatorEngine {
         self.stray_rule_indices = stray_indices;
         report.messages.extend(messages);
 
-        scan_policy.maybe_scan(html, &mut report.messages);
+        // Java stops at "Cannot recover after last error": nothing after that token
+        // is reported, tokenizer errors included.
+        scan_policy.maybe_scan(
+            &html[..halted_at.unwrap_or(html.len())],
+            &mut report.messages,
+        );
         self.attach_extracts(html, &mut report.messages);
         report
     }
