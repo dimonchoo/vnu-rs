@@ -14,11 +14,15 @@ off it, one stage per session.
 
 Baseline (2026-11-11): strict parity 5658/5824 (97.15%), oracle corpus 19/36.
 
+After stage 2 (2026-11-11): strict parity 5664/5824 (97.25%, no new failures), oracle
+corpus 26/36 on the original files; with 46 tree-construction files added, 72/82. The
+10 remaining diffs are RELAX NG content-model and datatype messages (stages 3 and 4).
+
 ## Why it differs today
 
-- Only the html5ever **tokenizer** is used, with a hand-made open-element stack.
-  Java uses nu htmlparser's full tree builder, so tree-construction parse errors are
-  missing ("Start tag “p” seen in “table”.", stray end tags, implied end tags).
+- Fixed in stage 2: tree construction. HTML now goes through a port of nu htmlparser's
+  TreeBuilder (`crates/vnu-parser/src/treebuilder`); XHTML and SVG still use the
+  hand-made stack in `engine/html_stack.rs`, because Java parses them as XML.
 - Content models are ~2.8k lines of hand-written special cases (figure, dl, details,
   colgroup, `rules/content_model.rs`). Java validates against the RELAX NG schema
   (`validator-upstream/schema/html5/*.rnc`) with Jing, so anything not special-cased
@@ -28,11 +32,17 @@ Baseline (2026-11-11): strict parity 5658/5824 (97.15%), oracle corpus 19/36.
 ## Stages
 
 1. [x] Honest metrics: strict `eval_parity`, `oracle_diff` against Java (`7b93823`).
-2. [ ] Tree construction like nu htmlparser
-   (`validator-upstream/htmlparser/src/nu/validator/htmlparser/impl/TreeBuilder.java`,
-   6.6k lines): emit the same parse errors with the same wording and positions. Either
-   port TreeBuilder or drive html5ever's tree builder and map its errors; the wording
-   must match Java exactly.
+2. [x] Tree construction like nu htmlparser (`665ffe1`, `0c18f82`). TreeBuilder is
+   ported with SAXStreamer semantics: foster parenting, adoption-agency reparenting
+   and attributes added to `html`/`body` report "Cannot recover after last error. Any
+   further errors will be ignored." and nothing after that token is reported (no rules,
+   no end-of-document checks, the syntax rescan stops there). Rules get start/end
+   events from the builder's pushes and pops, so implied `html`/`head`/`body`/`tbody`
+   and optional end tags match Java's checkers. The builder also picks the tokenizer
+   state (raw text, CDATA in foreign content). Not ported: fragment parsing,
+   `checkAttributes` xmlns errors, `checkPopName` XML 1.0 warnings (filtered upstream),
+   meta charset re-encoding. Tokenizer errors still come from html5ever plus the
+   `syntax/` rescan, not from nu's Tokenizer.
 3. [ ] RELAX NG: parse `schema/html5/*.rnc` at build time (embed the result), port Jing's
    derivative validator (`jing-trang/mod/rng-validate`, ~6.6k lines) and its messages
    (`resources/Messages.properties` plus v.Nu wording "Element “X” not allowed as child of
